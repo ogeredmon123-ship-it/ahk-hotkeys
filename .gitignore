@@ -1,0 +1,11 @@
+# --- Données patients : ne JAMAIS versionner (RGPD) ---
+CaptOrdo/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Divers
+*.log
+Thumbs.db
+desktop.ini
