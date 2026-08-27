@@ -15,7 +15,7 @@
 ;   Double Ctrl+D → rapatrie le dernier téléchargement dans CaptOrdo
 ;   Double Ctrl+I → injecte le dernier fichier CaptOrdo dans la boîte « Ouvrir »
 ;
-; Aucun chemin en dur (A_MyDocuments / A_UserProfile). Données patients
+; Aucun chemin en dur (A_MyDocuments / EnvGet("USERPROFILE")). Données patients
 ; dans Documents\CaptOrdo, local, purgées après PURGE_JOURS jours.
 ; ============================================================
 
@@ -41,8 +41,8 @@
 
 DOSSIER := A_MyDocuments "\CaptOrdo"             ; local, hors OneDrive (données patients)
 ; Chrome télécharge dans « Google Downloads » (réglage Chrome), les autres apps dans Downloads
-DOSSIERS_TELECHARGEMENT := [A_UserProfile "\OneDrive\Desktop\Google Downloads"
-    , A_UserProfile "\Downloads"]
+DOSSIERS_TELECHARGEMENT := [EnvGet("USERPROFILE") "\OneDrive\Desktop\Google Downloads"
+    , EnvGet("USERPROFILE") "\Downloads"]
 PURGE_JOURS := 30                                ; au-delà → corbeille au lancement ; 0 = désactivé
 
 DirCreate DOSSIER

@@ -18,8 +18,8 @@
 
 DOSSIER := A_MyDocuments "\CaptOrdo"             ; local, hors OneDrive (données patients)
 ; Chrome télécharge dans « Google Downloads » (réglage Chrome), les autres apps dans Downloads
-DOSSIERS_TELECHARGEMENT := [A_UserProfile "\OneDrive\Desktop\Google Downloads"
-    , A_UserProfile "\Downloads"]
+DOSSIERS_TELECHARGEMENT := [EnvGet("USERPROFILE") "\OneDrive\Desktop\Google Downloads"
+    , EnvGet("USERPROFILE") "\Downloads"]
 PURGE_JOURS := 30                                ; au-delà → corbeille au lancement ; 0 = désactivé
 
 DirCreate DOSSIER

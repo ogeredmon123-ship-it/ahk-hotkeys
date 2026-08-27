@@ -196,7 +196,7 @@ $^k:: {
     if (kPending) {
         SetTimer(SendNativeCtrlK, 0)
         kPending := false
-        Run 'wt.exe -d "' A_UserProfile '" claude'
+        Run 'wt.exe -d "' EnvGet("USERPROFILE") '" claude'
     } else {
         kPending := true
         SetTimer(SendNativeCtrlK, -350)
@@ -384,7 +384,7 @@ AfficherPowershell() {
     ; Fenêtre PowerShell DÉDIÉE : titre figé « PowerShell » (--suppressApplicationTitle)
     ; pour que le prochain double Ctrl+P la retrouve, -w new pour qu'elle ne parte
     ; jamais en onglet dans une fenêtre existante.
-    Run 'wt.exe -w new new-tab -d "' A_UserProfile '" --title "PowerShell" --suppressApplicationTitle'
+    Run 'wt.exe -w new new-tab -d "' EnvGet("USERPROFILE") '" --title "PowerShell" --suppressApplicationTitle'
     SetTimer(FocusPowershellNaissante, -400)
 }
 
