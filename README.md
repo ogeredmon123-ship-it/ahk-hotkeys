@@ -3,6 +3,10 @@
 Deux scripts AutoHotkey **v2** résidents, portables (aucun chemin en dur : `A_UserProfile` / `A_MyDocuments`).
 Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; un seul appui garde le comportement natif de la touche.
 
+## Version PRO (poste en pharmacie) → dossier [`pro/`](pro/)
+
+`pro/hotkeys-pro.ahk` : **un seul fichier** avec les 8 raccourcis strictement professionnels — **Ctrl+C, G, U, T, M** (recherche) + **Ctrl+O, D, I** (flux ordonnances). Sans TTS, IA, PowerShell ni clavier arabe. Voir [`pro/README.md`](pro/README.md).
+
 ## `recherche-selection.ahk` — recherche / TTS / IA
 
 | Double appui | Action |
