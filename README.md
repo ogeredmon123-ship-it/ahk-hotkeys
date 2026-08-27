@@ -14,7 +14,10 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 | **Ctrl+B** | Boîte de saisie → VIDAL (vide = accueil vidal.fr) |
 | **Ctrl+T** | Ouvre Theriaque (page recherche simple) |
 | **Ctrl+A** | Boîte de saisie → Claude.ai (pré-remplit le prompt) |
+| **Ctrl+M** | Ouvre Meddispar (médicaments à dispensation particulière) |
+| **Ctrl+P** | Ramène au premier plan la fenêtre PowerShell déjà ouverte (en crée une dédiée s'il n'y en a aucune) |
 | **Ctrl+K** | Ouvre Claude Code dans Windows Terminal |
+| **Ctrl+Calculatrice** | Bascule clavier arabe (disposition ar-SA + clavier visuel Windows) ; 2ᵉ double appui → retour AZERTY |
 
 ## `ordo-mutuelle.ahk` — flux ordonnances → logiciel officine
 
@@ -36,6 +39,8 @@ Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent 
 ### Dépendances par hotkey
 - **Ctrl+R (TTS)** : voix fr-FR (ex. Hortense/SAPI) installée, sinon voix par défaut.
 - **Ctrl+K** : Windows Terminal (`wt.exe`) + Claude Code installés.
+- **Ctrl+P** : Windows Terminal (`wt.exe`).
+- **Ctrl+Calculatrice** : clavier ar-SA ajouté dans Paramètres → Langue (sinon la bascule échoue) ; `osk.exe` natif Windows. Un clavier avec touche Calculatrice.
 - **Ctrl+O/D/I** : PowerShell + `Win+Shift+S` (natifs Windows 10/11). Le dossier « Google Downloads » n'existe que si Chrome y télécharge — sinon adapter `DOSSIERS_TELECHARGEMENT` dans `ordo-mutuelle.ahk`.
 
 ### Recharger après une modification

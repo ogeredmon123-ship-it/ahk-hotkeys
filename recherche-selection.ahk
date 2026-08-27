@@ -306,6 +306,112 @@ TheriaqueTap(natif := false) {
 
 TheriaqueTapNatif() => TheriaqueTap(true)
 
+; Double appui rapide sur Ctrl+M → ouvre MEDDISPAR (médicaments à dispensation
+; particulière, Ordre des pharmaciens) dans un onglet du navigateur.
+; Pas de boîte de saisie : ouverture directe, comme Theriaque.
+; Un seul Ctrl+M = comportement natif, renvoyé après DELAI ms.
+$^m:: MeddisparTap()
+
+MeddisparTap(natif := false) {
+    static DELAI := 300  ; ms d'attente avant de rendre Ctrl+M natif
+    static last := 0, pending := false
+    if (natif) {
+        pending := false
+        Send "^m"
+        return
+    }
+    now := A_TickCount
+    if (now - last < 50) {  ; auto-repeat (touche maintenue) : ignorer
+        last := now
+        return
+    }
+    last := now
+    if (pending) {
+        SetTimer(MeddisparTapNatif, 0)
+        pending := false
+        Run "https://www.meddispar.fr/"
+    } else {
+        pending := true
+        SetTimer(MeddisparTapNatif, -DELAI)
+    }
+}
+
+MeddisparTapNatif() => MeddisparTap(true)
+
+; Double appui rapide sur Ctrl+P → affiche la fenêtre PowerShell DÉJÀ ouverte
+; (premier plan, restaurée si minimisée) ; n'en ouvre une nouvelle que s'il n'y en a aucune.
+; Un seul Ctrl+P = comportement natif (imprimer…), renvoyé après DELAI ms.
+$^p:: PowershellTap()
+
+PowershellTap(natif := false) {
+    static DELAI := 300  ; ms d'attente avant de rendre Ctrl+P natif
+    static last := 0, pending := false
+    if (natif) {
+        pending := false
+        Send "^p"
+        return
+    }
+    now := A_TickCount
+    if (now - last < 50) {  ; auto-repeat (touche maintenue) : ignorer
+        last := now
+        return
+    }
+    last := now
+    if (pending) {
+        SetTimer(PowershellTapNatif, 0)
+        pending := false
+        AfficherPowershell()
+    } else {
+        pending := true
+        SetTimer(PowershellTapNatif, -DELAI)
+    }
+}
+
+PowershellTapNatif() => PowershellTap(true)
+
+AfficherPowershell() {
+    static lastRun := 0
+    if (h := TrouverFenetrePowershell()) {
+        WinActivate(h)
+        return
+    }
+    ; Anti-empilement : la fenêtre lancée au double-tap précédent met ~1-2 s à
+    ; recevoir son titre « PowerShell » ; pendant ce délai un nouveau double-tap
+    ; ne doit pas relancer une 2e fenêtre (le timer ci-dessous la focusera).
+    if (A_TickCount - lastRun < 5000)
+        return
+    lastRun := A_TickCount
+    ; Fenêtre PowerShell DÉDIÉE : titre figé « PowerShell » (--suppressApplicationTitle)
+    ; pour que le prochain double Ctrl+P la retrouve, -w new pour qu'elle ne parte
+    ; jamais en onglet dans une fenêtre existante.
+    Run 'wt.exe -w new new-tab -d "' A_UserProfile '" --title "PowerShell" --suppressApplicationTitle'
+    SetTimer(FocusPowershellNaissante, -400)
+}
+
+FocusPowershellNaissante() {
+    static essais := 0
+    if (h := TrouverFenetrePowershell()) {
+        essais := 0
+        WinActivate(h)
+        return
+    }
+    if (++essais < 15)  ; réessaie ~6 s le temps que la fenêtre reçoive son titre
+        SetTimer(FocusPowershellNaissante, -400)
+    else
+        essais := 0
+}
+
+TrouverFenetrePowershell() {
+    ; Fenêtre Windows Terminal dont l'onglet ACTIF est PowerShell — titre exact,
+    ; pas un « contient » : un onglet Claude Code peut mentionner PowerShell dans son titre.
+    ; Surtout PAS de détection par ahk_exe powershell.exe : les processus d'arrière-plan
+    ; exposent des consoles fantômes que WinActivate « active » sans rien afficher.
+    for h in WinGetList("ahk_exe WindowsTerminal.exe")
+        if RegExMatch(WinGetTitle(h), "^(Administrateur\s*:\s*)?(Windows\s)?PowerShell$")
+            return h
+    return 0
+}
+
 ; Double appui rapide sur Ctrl+A → boîte de saisie flottante « Claude », toujours vide :
 ;   Entrée avec du texte  → claude.ai/new avec la question pré-remplie dans le prompt
 ;   Entrée champ vide     → nouvelle conversation vierge sur claude.ai
@@ -365,6 +471,35 @@ ClaudeBoxSubmit(box, champ) {
         Run "https://claude.ai/new"  ; champ vide = conversation vierge
     else
         Run "https://claude.ai/new?q=" . UrlEncode(q)
+}
+
+; Double appui rapide sur Ctrl+<touche Calculatrice> (Launch_App2) → clavier arabe :
+;   1er double-tap → bascule la saisie en arabe (disposition arabe 101) + affiche le
+;                    clavier visuel Windows (osk.exe) pour voir/cliquer les lettres.
+;   2e double-tap  → referme le clavier visuel et repasse la saisie en français.
+; La touche Calculatrice seule garde son comportement natif (ouvrir la calculatrice).
+$^Launch_App2:: {
+    static last := 0
+    now := A_TickCount
+    gap := now - last
+    last := now
+    if (gap > 80 && gap < 500) {
+        last := 0
+        ToggleClavierArabe()
+    }
+}
+
+ToggleClavierArabe() {
+    static WM_INPUTLANGCHANGEREQUEST := 0x50
+    static HKL_AR := 0x04010401  ; arabe (101) — ar-SA
+    static HKL_FR := 0x040C040C  ; français AZERTY
+    if WinExist("ahk_exe osk.exe") {
+        PostMessage(WM_INPUTLANGCHANGEREQUEST, 0, HKL_FR, , "A")
+        WinClose("ahk_exe osk.exe")
+    } else {
+        PostMessage(WM_INPUTLANGCHANGEREQUEST, 0, HKL_AR, , "A")
+        Run "osk.exe"
+    }
 }
 
 ; Encodage percent UTF-8 (gère les accents : é → %C3%A9)
