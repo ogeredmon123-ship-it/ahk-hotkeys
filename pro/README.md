@@ -13,14 +13,46 @@
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
 
-## Installation sur le poste
+## Installation sur le poste — pas à pas, de zéro
 
-1. Installer **AutoHotkey v2** — https://www.autohotkey.com
-2. Télécharger le dépôt en ZIP — https://github.com/ogeredmon123-ship-it/ahk-hotkeys/archive/refs/heads/main.zip — l'ouvrir, et copier le contenu du dossier `pro` où tu veux (ex. `Documents`) : `Documents\hotkeys-pro.ahk` **et** `Documents\Lib\UIA.ahk` (le sous-dossier `Lib` doit rester à côté du script). Fichiers seuls : https://raw.githubusercontent.com/ogeredmon123-ship-it/ahk-hotkeys/main/pro/hotkeys-pro.ahk et https://raw.githubusercontent.com/ogeredmon123-ship-it/ahk-hotkeys/main/pro/Lib/UIA.ahk (clic droit → « Enregistrer le lien sous »).
-3. Double-clic dessus → icône verte « H » dans la zone de notification = ça tourne.
-4. Démarrage automatique : `Win+R` → `shell:startup` → y déposer un **raccourci** vers le `.ahk`.
+### 1. Installer AutoHotkey v2 (une seule fois par PC)
+1. Ouvrir https://www.autohotkey.com → bouton **Download** → **Download v2.0**.
+2. Lancer le fichier téléchargé (`AutoHotkey_2.0.x_setup.exe`) → **Install** (réglages par défaut) → fermer.
+3. Vérification : menu Démarrer → taper « AutoHotkey » → « AutoHotkey Dash » apparaît.
+   - Si Windows demande un mot de passe administrateur que tu n'as pas : demander au titulaire (ou choisir l'installation « pour moi seulement » si l'installeur la propose).
+   - Si un antivirus bloque AutoHotkey : c'est fréquent en entreprise, il faut l'autoriser (titulaire / informaticien).
 
-Aucun chemin en dur : `C:\Users\<compte>\Documents\CaptOrdo` est créé au premier lancement — toujours le dossier Documents **local** du compte, jamais OneDrive, même si « Documents » est redirigé vers OneDrive sur le poste (Ctrl+I l'ouvre dans l'Explorateur s'il est vide). **Ctrl+D** se lance depuis le navigateur, le document du patient à l'écran : il demande le nom, clique lui-même le bouton « Télécharger » / « Download » de la page (Gmail, WhatsApp Web, Doctolib…) — ou fait Ctrl+S pour une image / un PDF ouvert dans un onglet — puis attrape le fichier qui arrive dans le dossier de téléchargement du navigateur (détecté automatiquement : « Téléchargements » Windows, `Downloads`, dossiers configurés dans Chrome / Edge / Firefox, Bureau) et le range nommé dans `CaptOrdo`. Rien dans les 30 s → message → Ctrl+O. Ouvertures web dans le **navigateur par défaut** du poste.
+### 2. Récupérer les deux fichiers
+- **Depuis GitHub** : https://github.com/ogeredmon123-ship-it/ahk-hotkeys → bouton vert **Code** → **Download ZIP** → `ahk-hotkeys-main.zip` arrive dans Téléchargements. (Dépôt privé = il faut être connecté à GitHub ; s'il est public, le ZIP direct marche aussi : https://github.com/ogeredmon123-ship-it/ahk-hotkeys/archive/refs/heads/main.zip .)
+- **Sans GitHub** : le ZIP `hotkeys-pro.zip` déposé dans OneDrive (« Claude dossiers ») contient exactement le dossier `pro`.
+
+### 3. Décompresser et placer
+1. Clic droit sur le ZIP → **Extraire tout…** → **Extraire**.
+2. Dans le dossier extrait, ouvrir `ahk-hotkeys-main` → `pro`. Il contient : `hotkeys-pro.ahk`, un dossier `Lib` (avec `UIA.ahk`) et ce README.
+3. Copier **`hotkeys-pro.ahk` ET le dossier `Lib`** dans `Documents` du compte du poste. Résultat attendu :
+   - `Documents\hotkeys-pro.ahk`
+   - `Documents\Lib\UIA.ahk`
+   Le dossier `Lib` doit rester **à côté** du script, sinon Ctrl+D ne peut pas cliquer « Télécharger ».
+
+### 4. Lancer
+1. Double-clic sur `hotkeys-pro.ahk` → une icône verte **« H »** apparaît dans la zone de notification (en bas à droite, parfois cachée sous la petite flèche ^). C'est tout : les raccourcis sont actifs.
+2. Si Windows demande « avec quelle application ouvrir ce fichier » : AutoHotkey n'est pas installé (retour à l'étape 1) — ou choisir `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe`.
+3. Au premier lancement, le dossier `C:\Users\<compte>\Documents\CaptOrdo` est créé (Documents **local**, jamais OneDrive).
+
+### 5. Tester (2 minutes)
+- **Ctrl+O** : double appui rapide (deux Ctrl+O en moins d'une demi-seconde) → sélectionner une zone de l'écran → nom du patient → OK → « Enregistré : … ». Le PNG est dans `CaptOrdo`.
+- **Ctrl+D** : dans Chrome, ouvrir un mail avec une pièce jointe, cliquer la pièce jointe (aperçu plein écran) → double Ctrl+D → nom du patient → OK → « Téléchargement… » puis « Rangé dans CaptOrdo : … ». Un bandeau **rouge** = échec, et il dit quoi faire (en général : Ctrl+O).
+- **Ctrl+I** : dans le logiciel, boîte « Ouvrir » ouverte → double Ctrl+I → le chemin du dernier fichier est inséré + Entrée. Hors boîte « Ouvrir » (mail, chat) : double Ctrl+I colle le dernier fichier de `CaptOrdo`.
+- Chrome : Paramètres → Téléchargements → « Demander où enregistrer chaque fichier » doit être **désactivé** (réglage par défaut) ; l'emplacement peut être n'importe lequel, le script le détecte.
+
+### 6. Démarrage automatique (pour ne plus y penser)
+1. `Win+R` → taper `shell:startup` → Entrée : le dossier « Démarrage » s'ouvre.
+2. Dans `Documents`, clic droit sur `hotkeys-pro.ahk` → **Créer un raccourci** → glisser ce raccourci dans le dossier « Démarrage ».
+3. À la prochaine ouverture de session, le script démarre tout seul (icône « H »).
+
+### 7. Mettre à jour / arrêter
+- Mise à jour : re-télécharger le ZIP, remplacer `hotkeys-pro.ahk` et `Lib\UIA.ahk`, double-clic sur le script (il remplace l'ancien automatiquement).
+- Arrêter : clic droit sur l'icône « H » → **Exit**. Désinstaller : supprimer les fichiers et le raccourci de « Démarrage ».
 
 ## Données patients (RGPD)
 
