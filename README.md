@@ -5,7 +5,7 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 
 ## Version PRO (poste en pharmacie) → dossier [`pro/`](pro/)
 
-`pro/hotkeys-pro.ahk` : **un seul fichier** avec les 8 raccourcis strictement professionnels — **Ctrl+C, G, U, T, M** (recherche) + **Ctrl+O, D, I** (flux ordonnances). Sans TTS, IA, PowerShell ni clavier arabe. Voir [`pro/README.md`](pro/README.md).
+`pro/hotkeys-pro.ahk` (+ `pro/Lib/UIA.ahk`) : **un seul script** avec les 8 raccourcis strictement professionnels — **Ctrl+C, G, U, T, M** (recherche) + **Ctrl+O, D, I** (flux ordonnances). Sans TTS, IA, PowerShell ni clavier arabe. Voir [`pro/README.md`](pro/README.md).
 
 ## `recherche-selection.ahk` — recherche / TTS / IA
 
@@ -28,8 +28,8 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 | Double appui | Action |
 |---|---|
 | **Ctrl+O** | Capture d'écran → PNG horodaté + nom patient dans `Documents\CaptOrdo` |
-| **Ctrl+D** | Rapatrie le dernier fichier téléchargé vers `CaptOrdo` |
-| **Ctrl+I** | Injecte le dernier fichier dans la boîte « Ouvrir » active (sinon copie + Explorateur) |
+| **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
+| **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
 
 Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent à la corbeille au lancement (`PURGE_JOURS := 0` pour désactiver). Le dossier `CaptOrdo` contient des **données patients** : il est exclu par `.gitignore` et ne doit jamais être versionné.
 
@@ -45,7 +45,7 @@ Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent 
 - **Ctrl+K** : Windows Terminal (`wt.exe`) + Claude Code installés.
 - **Ctrl+P** : Windows Terminal (`wt.exe`).
 - **Ctrl+Calculatrice** : clavier ar-SA ajouté dans Paramètres → Langue (sinon la bascule échoue) ; `osk.exe` natif Windows. Un clavier avec touche Calculatrice.
-- **Ctrl+O/D/I** : PowerShell + `Win+Shift+S` (natifs Windows 10/11). Le dossier « Google Downloads » n'existe que si Chrome y télécharge — sinon adapter `DOSSIERS_TELECHARGEMENT` dans `ordo-mutuelle.ahk`.
+- **Ctrl+O/D/I** : PowerShell + `Win+Shift+S` (natifs Windows 10/11) + `Lib\UIA.ahk` ([UIA-v2](https://github.com/Descolada/UIA-v2), MIT, copie incluse — à placer dans un dossier `Lib` à côté de `ordo-mutuelle.ahk`). Ctrl+D clique lui-même « Télécharger » dans la page affichée et attrape le fichier dans le dossier de téléchargement du navigateur (détecté au lancement : « Téléchargements » Windows, `Downloads`, dossiers configurés dans Chrome / Edge / Firefox, Bureau) — rien à adapter.
 
 ### Recharger après une modification
 Clic droit sur l'icône « H » dans le systray → **Reload Script**.
