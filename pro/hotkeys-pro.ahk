@@ -49,6 +49,12 @@ DOSSIER := EnvGet("USERPROFILE") "\Documents\CaptOrdo"   ; Documents LOCAL du co
 ; Ctrl+D y guette le fichier qui ARRIVE après son clic (jamais un fichier déjà présent).
 DOSSIERS_TELECHARGEMENT := DossiersTelechargement()
 PURGE_JOURS := 30                                ; au-delà → corbeille au lancement ; 0 = désactivé
+JOURNAL := A_ScriptDir "\hotkeys-pro.log"           ; trace horodatée de chaque appui ; "" = désactivé
+EXT_IMPORT := "i)^(png|jpe?g|gif|bmp|webp|heic|pdf)$"   ; seuls ces types sont proposés par Ctrl+I
+; Filet de sécurité : si le dernier fichier de CaptOrdo n'est pas tout frais, c'est qu'un Ctrl+D
+; vient d'échouer sans qu'on s'en aperçoive — Ctrl+I demande alors confirmation, au lieu d'insérer
+; en silence le document du patient PRÉCÉDENT.
+FRAICHEUR_MIN := 10                              ; minutes ; 0 = désactivé
 
 DirCreate DOSSIER
 
@@ -158,6 +164,7 @@ TelechargerVersCaptOrdo() {
     hwnd := WinExist("A")
     exe := ""
     try exe := WinGetProcessName(hwnd)
+    J("--- Ctrl+D sur : " FenetreActive())
     if !(exe ~= "i)^(chrome|msedge|firefox|brave)\.exe$") {
         Erreur("Ctrl+D se lance depuis le navigateur (Chrome, Edge, Firefox) : affiche le document du patient, puis Ctrl+D. Sinon : Ctrl+O.", 7000)
         return
@@ -183,13 +190,23 @@ TelechargerVersCaptOrdo() {
             Erreur("Le bouton Télécharger a été cliqué mais rien n'est arrivé (30 s) → Ctrl+O (capture).", 8000)
             return
         }
+        ; Contrôle sur le CONTENU, pas sur l'extension : un « Enregistrer la page » parti sans qu'on
+        ; le voie donnerait un .html, et CaptOrdo ne doit contenir que des documents exploitables.
+        ; Le fichier refusé reste dans le dossier de téléchargement — rien n'est supprimé.
+        if !DocumentValide(src) {
+            J("Ctrl+D : REJET — " NomFichier(src) " n'est ni une image ni un PDF")
+            Erreur("Le fichier téléchargé n'est ni une image ni un PDF (page web ?) — rien n'a été ajouté à CaptOrdo → Ctrl+O (capture).", 8000)
+            return
+        }
         SplitPath src, , , &ext
         ext := ExtensionReelle(src, ext)
         dest := DOSSIER "\" FormatTime(A_Now, "yyyy-MM-dd_HHmmss") (nom != "" ? "_" nom : "") (ext != "" ? "." ext : "")
         try {
             FileMove src, dest, 1
+            J("Ctrl+D : OK -> " dest)
             Notif("Rangé dans CaptOrdo : " NomFichier(dest), 5000)
         } catch {
+            J("Ctrl+D : ÉCHEC du déplacement de " src)
             Erreur("Téléchargé mais impossible à déplacer (fichier verrouillé ?) : " src, 8000)
         }
         return
@@ -209,10 +226,20 @@ DevantNommer() {
 }
 
 FinirEnregistrement(dest) {
-    if AttendreFichier(dest, 30000)
-        Notif("Enregistré dans CaptOrdo : " NomFichier(dest), 5000)
-    else
+    if !AttendreFichier(dest, 30000) {
         Erreur("Rien n'est arrivé dans CaptOrdo (30 s) → Ctrl+O (capture).", 8000)
+        return
+    }
+    ; Ici le fichier est DÉJÀ dans CaptOrdo : l'y laisser piégerait le prochain Ctrl+I, qui le
+    ; prendrait pour le document du patient. Corbeille (récupérable), jamais suppression sèche.
+    if !DocumentValide(dest) {
+        try FileRecycle dest
+        J("Ctrl+D : REJET — " NomFichier(dest) " n'est ni une image ni un PDF")
+        Erreur("Ce n'est pas un document (page web ?) — rien n'a été ajouté à CaptOrdo → Ctrl+O (capture).", 8000)
+        return
+    }
+    J("Ctrl+D : OK -> " dest)
+    Notif("Enregistré dans CaptOrdo : " NomFichier(dest), 5000)
 }
 
 ; Clique le bouton « Télécharger » / « Download » de la PAGE affichée (UI Automation, dans le contenu web
@@ -390,13 +417,25 @@ ImporterDernierFichier() {
         Erreur("Dossier CaptOrdo vide — rien à importer")
         return
     }
+    ; La boîte « Ouvrir » est repérée AVANT le contrôle de fraîcheur : sa MsgBox prend le focus, et
+    ; « la fenêtre active » ne serait alors plus la boîte de dialogue du logiciel officine.
+    hDlg := WinActive("ahk_class #32770")   ; 0 = aucune boîte Ouvrir/Enregistrer au premier plan
+    J("--- Ctrl+I sur : " FenetreActive() " | boîte standard : " (hDlg ? "oui" : "non"))
+    J("    fichier retenu : " NomFichier(dernier) " (" AgeTexte(AgeMinutes(dernier)) ")")
+    dernier := ConfirmerSiVieux(dernier, "Insérer")
+    if (dernier = "") {   ; chaîne vide = l'utilisateur a refusé
+        J("    abandonné : document jugé trop ancien")
+        return
+    }
     KeyWait "Ctrl"
-    if WinActive("ahk_class #32770") {  ; boîte de dialogue Ouvrir/Enregistrer standard
+    if (hDlg && WinExist("ahk_id " hDlg)) {  ; boîte de dialogue Ouvrir/Enregistrer standard
         try {
-            ControlFocus "Edit1", "A"
-            ControlSetText dernier, "Edit1", "A"
+            WinActivate hDlg
+            ControlFocus "Edit1", hDlg
+            ControlSetText dernier, "Edit1", hDlg
             Sleep 120
-            ControlSend "{Enter}", "Edit1", "A"
+            ControlSend "{Enter}", "Edit1", hDlg
+            J("    inséré dans la boîte « Ouvrir »")
             return
         }
         ; contrôle introuvable → repli presse-papiers ci-dessous
@@ -406,6 +445,7 @@ ImporterDernierFichier() {
     ; pièce jointe dans Gmail / Doctolib / WhatsApp Web, image dans un mail, un chat ou Word
     CopierFichierPressePapiers(dernier)
     Send "^v"
+    J("    collé dans " FenetreActive())
     Notif("Collé : " NomFichier(dernier) "  (reste dans le presse-papiers → Ctrl+V ailleurs si besoin)", 6000)
 }
 
@@ -427,21 +467,18 @@ CopierFichierPressePapiers(chemin) {
 
 ; ---------- Utilitaires ----------
 
-; Fichier le plus récent d'un ou plusieurs dossiers (ignore téléchargements en cours et fichiers système).
-; « Récent » = date d'ARRIVÉE : l'horodatage du nom (yyyy-MM-dd_HHmmss, posé par Ctrl+O / Ctrl+D) prime
-; sur la date de modification, que FileMove conserve — sinon un fichier rapatrié pouvait rester derrière
-; un plus ancien et Ctrl+I reprenait toujours le mauvais.
+; Fichier le plus récent d'un ou plusieurs dossiers. Liste BLANCHE d'extensions (EXT_IMPORT) : seuls
+; une image ou un PDF ont un sens dans une boîte « Ouvrir » ; cela écarte du même coup les
+; téléchargements en cours (.crdownload, .part) et les fichiers système (.ini, desktop.ini).
 DernierFichier(dossiers) {
     if !(dossiers is Array)
         dossiers := [dossiers]
     meilleur := "", meilleurTime := 0
     for dossier in dossiers {
         Loop Files dossier "\*.*" {
-            if (A_LoopFileExt ~= "i)^(crdownload|tmp|partial|ini)$")
+            if !(A_LoopFileExt ~= EXT_IMPORT)
                 continue
-            t := A_LoopFileTimeModified
-            if RegExMatch(A_LoopFileName, "^(\d{4})-(\d{2})-(\d{2})_(\d{6})", &m)
-                t := m[1] m[2] m[3] m[4]
+            t := DateArrivee(A_LoopFileFullPath, A_LoopFileName, A_LoopFileTimeModified)
             if (t > meilleurTime) {
                 meilleurTime := t
                 meilleur := A_LoopFileFullPath
@@ -449,6 +486,50 @@ DernierFichier(dossiers) {
         }
     }
     return meilleur
+}
+
+; Date d'ARRIVÉE d'un fichier : l'horodatage du nom (yyyy-MM-dd_HHmmss, posé par Ctrl+O / Ctrl+D)
+; prime sur la date de modification, que FileMove conserve — sinon un fichier rapatrié restait
+; derrière un plus ancien et Ctrl+I reprenait toujours le mauvais. Règle unique, partagée par
+; DernierFichier et le contrôle de fraîcheur : les deux désignent forcément le même fichier.
+DateArrivee(chemin, nom := "", modif := "") {
+    if (nom = "")
+        nom := NomFichier(chemin)
+    if RegExMatch(nom, "^(\d{4})-(\d{2})-(\d{2})_(\d{6})", &m)
+        return m[1] m[2] m[3] m[4]
+    return (modif != "") ? modif : FileGetTime(chemin, "M")
+}
+
+AgeMinutes(chemin) {
+    return DateDiff(A_Now, DateArrivee(chemin), "Minutes")
+}
+
+AgeTexte(min) {
+    if (min < 1)
+        return "à l'instant"
+    if (min < 60)
+        return min " min"
+    if (min < 1440)
+        return Round(min / 60) " h"
+    return Round(min / 1440) " j"
+}
+
+; Garde-fou anti « mauvais patient ». Un Ctrl+D qui échoue sans qu'on le remarque laisse le document
+; du patient PRÉCÉDENT en tête de CaptOrdo ; sans ce contrôle, Ctrl+I l'enverrait dans le dossier du
+; patient suivant. Au-delà de FRAICHEUR_MIN minutes, plus rien n'est donc pris en silence.
+; Renvoie le chemin si l'on peut continuer, "" si l'utilisateur refuse.
+ConfirmerSiVieux(chemin, action) {
+    if (FRAICHEUR_MIN <= 0 || chemin = "")
+        return chemin
+    age := AgeMinutes(chemin)
+    if (age <= FRAICHEUR_MIN)
+        return chemin
+    txt := "Aucun document récent (moins de " FRAICHEUR_MIN " min) dans CaptOrdo.`n`n"
+        . "Le plus récent est :`n" NomFichier(chemin) "`n"
+        . "du " FormatTime(DateArrivee(chemin), "dd/MM/yyyy à HH:mm") "  (il y a " AgeTexte(age) ")`n`n"
+        . action " ce fichier quand même ?"
+    ; Default2 = « Non » présélectionné : un appui réflexe sur Entrée ne prend pas un vieux document.
+    return (MsgBox(txt, "Vérifier le fichier", "YesNo Icon! Default2") = "Yes") ? chemin : ""
 }
 
 ; Dossiers où chercher le dernier téléchargement — résolus au lancement, existants, dédoublonnés :
@@ -502,9 +583,9 @@ DossierConnu(guid) {
     return d
 }
 
-; Extension d'après le CONTENU du fichier (signature des premiers octets) quand le téléchargement
-; n'en a pas ou qu'elle ment ; sinon l'extension d'origine est gardée
-ExtensionReelle(chemin, ext) {
+; Type réel d'après les premiers octets : "png", "jpg", "pdf", "gif", "bmp", "webp", ou "" si le
+; fichier n'est ni une image ni un PDF — une page web enregistrée par erreur, par exemple.
+SignatureFichier(chemin) {
     hex := ""
     try {
         f := FileOpen(chemin, "r")
@@ -514,19 +595,31 @@ ExtensionReelle(chemin, ext) {
         Loop n
             hex .= Format("{:02X}", NumGet(buf, A_Index - 1, "UChar"))
     }
-    sig := ""
     if (InStr(hex, "89504E47") = 1)
-        sig := "png"
-    else if (InStr(hex, "FFD8FF") = 1)
-        sig := "jpg"
-    else if (InStr(hex, "25504446") = 1)          ; %PDF
-        sig := "pdf"
-    else if (InStr(hex, "47494638") = 1)          ; GIF8
-        sig := "gif"
-    else if (InStr(hex, "424D") = 1)              ; BM
-        sig := "bmp"
-    else if (InStr(hex, "52494646") = 1 && SubStr(hex, 17, 8) = "57454250")   ; RIFF….WEBP
-        sig := "webp"
+        return "png"
+    if (InStr(hex, "FFD8FF") = 1)
+        return "jpg"
+    if (InStr(hex, "25504446") = 1)               ; %PDF
+        return "pdf"
+    if (InStr(hex, "47494638") = 1)               ; GIF8
+        return "gif"
+    if (InStr(hex, "424D") = 1)                   ; BM
+        return "bmp"
+    if (InStr(hex, "52494646") = 1 && SubStr(hex, 17, 8) = "57454250")   ; RIFF….WEBP
+        return "webp"
+    return ""
+}
+
+; Document exploitable = image ou PDF reconnu à ses OCTETS, pas à son extension : une page web
+; enregistrée en « .pdf » commence par « <!DOCTYPE » et n'a rien à faire dans CaptOrdo.
+DocumentValide(chemin) {
+    return SignatureFichier(chemin) != ""
+}
+
+; Extension d'après le CONTENU du fichier quand le téléchargement n'en a pas ou qu'elle ment ;
+; sinon l'extension d'origine est gardée
+ExtensionReelle(chemin, ext) {
+    sig := SignatureFichier(chemin)
     if (sig = "")
         return ext
     if (ext = "")
@@ -561,10 +654,27 @@ Notif(txt, ms := 3500) {
     SetTimer () => ToolTip(), -ms
 }
 
+; Trace horodatée : permet de savoir APRÈS COUP quel fichier a été pris, et d'où. Le journal reste
+; local — il peut contenir des noms de patients, et *.log est exclu par .gitignore.
+J(txt) {
+    if (JOURNAL = "")
+        return
+    try FileAppend FormatTime(A_Now, "yyyy-MM-dd HH:mm:ss") "  " txt "`n", JOURNAL, "UTF-8"
+}
+
+; Fenêtre active (processus + titre), pour le journal
+FenetreActive() {
+    try
+        return WinGetProcessName("A") " | " WinGetTitle("A")
+    catch
+        return "(inconnue)"
+}
+
 ; Message d'ERREUR bien visible : bandeau rouge, gros texte blanc, en haut de l'écran, toujours devant ;
 ; se ferme seul après ms millisecondes ou au clic ; ne prend pas le clavier (on peut enchaîner Ctrl+O)
 Erreur(txt, ms := 8000) {
     static courant := 0
+    J("  ERREUR : " txt)
     if courant
         try courant.Destroy()
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +Border", "Erreur")

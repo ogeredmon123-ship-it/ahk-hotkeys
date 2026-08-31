@@ -31,6 +31,12 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
 
+### Garde-fous « bon fichier, bon patient »
+- **Contenu vérifié** : Ctrl+D lit les premiers octets du fichier obtenu et n'accepte que les images et les PDF. Une page web enregistrée par erreur — même nommée `.pdf` — est refusée ; si elle est déjà arrivée dans `CaptOrdo`, elle part à la corbeille.
+- **Fraîcheur vérifiée** : si le dernier fichier de `CaptOrdo` a plus de `FRAICHEUR_MIN` minutes (10 par défaut ; `0` pour désactiver), Ctrl+I demande confirmation en affichant son nom et sa date, **« Non » présélectionné**. Sans ce contrôle, un Ctrl+D passé inaperçu ferait insérer le document du patient **précédent**.
+- **Liste blanche** : seuls `png jpg jpeg gif bmp webp heic pdf` sont proposés par Ctrl+I (`EXT_IMPORT`), ce qui écarte au passage les téléchargements en cours et les fichiers système.
+- **Journal** : chaque Ctrl+D / Ctrl+I écrit une ligne horodatée dans `ordo-mutuelle.log`, à côté du script — fenêtre active, fichier retenu et son âge, erreurs — pour retrouver après coup ce qui a été pris. `JOURNAL := ""` pour désactiver. Il peut contenir des noms de patients : il reste **local** (`*.log` est dans `.gitignore`).
+
 Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent à la corbeille au lancement (`PURGE_JOURS := 0` pour désactiver). Le dossier `CaptOrdo` contient des **données patients** : il est exclu par `.gitignore` et ne doit jamais être versionné.
 
 ## Installation sur un nouveau PC

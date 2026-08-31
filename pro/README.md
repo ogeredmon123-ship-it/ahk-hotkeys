@@ -13,6 +13,11 @@
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
 
+### Garde-fous « bon fichier, bon patient »
+- **Contenu vérifié** : Ctrl+D n'accepte que les images et les PDF, reconnus à leurs premiers octets. Une page web enregistrée par erreur — même nommée `.pdf` — est refusée ; si elle est déjà arrivée dans `CaptOrdo`, elle part à la corbeille.
+- **Fraîcheur vérifiée** : si le dernier fichier de `CaptOrdo` a plus de 10 minutes (`FRAICHEUR_MIN`, `0` pour désactiver), Ctrl+I demande confirmation en affichant son nom et sa date, **« Non » présélectionné**. Sans ce contrôle, un Ctrl+D passé inaperçu ferait insérer le document du patient **précédent**.
+- **Journal** : chaque Ctrl+D / Ctrl+I écrit une ligne horodatée dans `hotkeys-pro.log`, à côté du script. Il peut contenir des noms de patients : il reste **local**, jamais versionné ni synchronisé.
+
 ## Installation sur le poste — pas à pas, de zéro
 
 ### 1. Installer AutoHotkey v2 (une seule fois par PC)
