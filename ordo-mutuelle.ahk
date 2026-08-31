@@ -149,8 +149,10 @@ TelechargerVersCaptOrdo() {
     SetTimer(DevantNommer, -50)
     ib := InputBox("Le document affiché va être téléchargé dans CaptOrdo.`n`nNom du patient (vide = horodatage seul) :"
         , "Télécharger vers CaptOrdo", "w460 h160")
-    if (ib.Result != "OK")
+    if (ib.Result != "OK") {
+        J("    abandonné : nom du patient non saisi")   ; sans cette ligne, un Ctrl+D annulé ressemblait dans le journal à un Ctrl+D resté sans réponse
         return
+    }
     nom := NettoyerNom(ib.Value)
     WinActivate hwnd
     WinWaitActive hwnd, , 2
@@ -397,7 +399,9 @@ ImporterDernierFichier() {
     ; La boîte « Ouvrir » est repérée AVANT le contrôle de fraîcheur : sa MsgBox prend le focus, et
     ; « la fenêtre active » ne serait alors plus la boîte de dialogue du logiciel officine.
     hDlg := WinActive("ahk_class #32770")   ; 0 = aucune boîte Ouvrir/Enregistrer au premier plan
-    J("--- Ctrl+I sur : " FenetreActive() " | boîte standard : " (hDlg ? "oui" : "non"))
+    ; La classe est journalisée : c'est ELLE qui dit comment le chemin sera inséré — #32770 = vraie
+    ; boîte Windows (ControlSetText), SunAwtDialog = boîte dessinée par Java/LGPI (collage clavier).
+    J("--- Ctrl+I sur : " FenetreActive() " | classe " ClasseActive() " | boîte standard : " (hDlg ? "oui" : "non"))
     J("    fichier retenu : " NomFichier(dernier) " (" AgeTexte(AgeMinutes(dernier)) ")")
     dernier := ConfirmerSiVieux(dernier, "Insérer")
     if (dernier = "") {   ; chaîne vide = l'utilisateur a refusé
@@ -417,6 +421,13 @@ ImporterDernierFichier() {
         }
         ; contrôle introuvable → repli presse-papiers ci-dessous
     }
+    ; Boîte « Ouvrir » NON standard : LGPI dessine la sienne en Java (Swing). Elle n'a aucun contrôle
+    ; Windows à remplir, et surtout elle ne comprend PAS le presse-papiers « fichier » (CF_HDROP) : le
+    ; Ctrl+V du repli ci-dessous n'y collait rien — d'où les « collé dans java.exe | Ouvrir » sans effet.
+    ; On y insère donc le CHEMIN EN TEXTE, comme si on le tapait dans « Nom du fichier ».
+    hJava := BoiteFichierJava()
+    if (hJava && InsererCheminJava(hJava, dernier))
+        return
     ; copie le FICHIER dans le presse-papiers (comme Ctrl+C dans l'Explorateur) — pour une capture
     ; (PNG/JPG) l'IMAGE elle-même est ajoutée aussi — puis le colle (Ctrl+V) dans la fenêtre active :
     ; pièce jointe dans Gmail / Doctolib / WhatsApp Web, image dans un mail, un chat ou Word
@@ -424,6 +435,67 @@ ImporterDernierFichier() {
     Send "^v"
     J("    collé dans " FenetreActive())
     Notif("Collé : " NomFichier(dernier) "  (reste dans le presse-papiers → Ctrl+V ailleurs si besoin)", 6000)
+}
+
+; La boîte de fichiers de LGPI est-elle au premier plan ? Elle est dessinée par Java (Swing) : classe
+; SunAwtDialog et non #32770 — ni Edit1 à remplir, ni presse-papiers « fichier » compris. On la
+; reconnaît au couple processus Java + titre de boîte de fichiers ; la fenêtre PRINCIPALE de LGPI
+; (« … Portail Pharmagest … ») ne matche pas — elle héberge un navigateur, où coller un FICHIER marche.
+BoiteFichierJava() {
+    try {
+        if !(WinGetProcessName("A") ~= "i)^javaw?\.exe$")
+            return 0
+        if !(WinGetTitle("A") ~= "i)^\s*(ouvrir|open|importer|import|enregistrer|save|charger|parcourir|s[ée]lectionner|choisir)\b")
+            return 0
+        return WinActive("A")
+    }
+    return 0
+}
+
+; Insère le chemin dans la boîte Java : collage en TEXTE dans « Nom du fichier », puis Entrée — mais
+; l'Entrée n'est envoyée qu'APRÈS relecture du champ. Si le clavier était resté sur la LISTE des
+; fichiers, le collage n'a rien fait et une Entrée à l'aveugle ouvrirait le fichier sélectionné : le
+; document d'un AUTRE patient. Renvoie false seulement si la boîte a disparu (→ repli presse-papiers).
+InsererCheminJava(hwnd, chemin) {
+    titre := ""
+    try titre := WinGetTitle("ahk_id " hwnd)
+    WinActivate hwnd
+    if !WinWaitActive("ahk_id " hwnd, , 2)
+        return false
+    A_Clipboard := chemin
+    if !ClipWait(2, 0)
+        return false
+    Send "{Home}+{End}"      ; remplace ce que la boîte propose déjà, au lieu de coller à la suite
+    Send "^v"
+    Sleep 250
+    lu := ChampRelu()
+    A_Clipboard := chemin    ; le chemin reste sous la main pour un Ctrl+V manuel
+    if (lu != chemin) {
+        J("    boîte Java « " titre " » : chemin NON inséré (champ lu : « " lu " ») — Entrée non envoyée")
+        Erreur("LGPI n'a pas pris le chemin : cliquez dans « Nom du fichier », puis Ctrl+V et Entrée (le chemin est dans le presse-papiers).", 10000)
+        return true          ; traité : surtout ne pas coller un fichier par-dessus
+    }
+    Send "{End}{Enter}"
+    J("    inséré dans la boîte Java « " titre " »")
+    Notif("Inséré : " NomFichier(chemin), 5000)
+    return true
+}
+
+; Relit le champ qui vient d'être collé : sélection de la ligne, puis copie. La copie passe par
+; Ctrl+Inser (équivalent Swing de Ctrl+C) — un Ctrl+C simulé déclencherait le ~^c de
+; recherche-selection.ahk. La sentinelle distingue « champ vide » de « rien n'a été copié » (clavier
+; hors du champ de saisie) ; dans les deux cas le résultat diffère du chemin, donc pas d'Entrée.
+ChampRelu() {
+    static SENTINELLE := "«?»"
+    A_Clipboard := SENTINELLE
+    Send "{Home}+{End}^{Insert}"
+    debut := A_TickCount
+    while (A_TickCount - debut < 1200) {
+        Sleep 100
+        if (A_Clipboard != SENTINELLE)
+            return Trim(A_Clipboard)
+    }
+    return ""
 }
 
 ; Met un fichier dans le presse-papiers (CF_HDROP) ; si c'est une image, ajoute aussi l'image (bitmap + PNG)
@@ -643,6 +715,15 @@ J(txt) {
 FenetreActive() {
     try
         return WinGetProcessName("A") " | " WinGetTitle("A")
+    catch
+        return "(inconnue)"
+}
+
+; Classe de la fenêtre active, pour le journal : #32770 = boîte Windows standard (remplie par
+; ControlSetText), SunAwtDialog = boîte dessinée par Java (remplie au clavier, voir InsererCheminJava)
+ClasseActive() {
+    try
+        return WinGetClass("A")
     catch
         return "(inconnue)"
 }
