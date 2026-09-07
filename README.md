@@ -49,6 +49,7 @@ Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent 
 2. **Cloner ce dépôt** (ou copier les deux `.ahk`).
 3. **Tester** : double-clic sur chaque `.ahk` → une icône verte « H » apparaît dans la zone de notification = le script tourne.
 4. **Démarrage automatique** : `Win+R` → `shell:startup` → y déposer un **raccourci** vers chaque `.ahk`.
+5. **Purge automatique des dossiers Ordo** (recommandé) : double-clic sur `purge-ordo\Installer.cmd` → `CaptOrdo` et « Ordo du jour » sont vidés vers la **Corbeille toutes les 2 h** par une tâche planifiée. Voir [`purge-ordo/README.md`](purge-ordo/README.md).
 
 ### Dépendances par hotkey
 - **Ctrl+R (TTS)** : voix fr-FR (ex. Hortense/SAPI) installée, sinon voix par défaut.
