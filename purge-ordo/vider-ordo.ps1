@@ -1,4 +1,4 @@
-# Vide le contenu de CaptOrdo et "Ordo du jour" vers la Corbeille.
+﻿# Vide le contenu de CaptOrdo et "Ordo du jour" vers la Corbeille.
 # Lance automatiquement toutes les 2 heures par la tache planifiee "Vider dossiers Ordo".
 # Portable : aucun chemin en dur, tout est deduit du profil de l'utilisateur courant.
 

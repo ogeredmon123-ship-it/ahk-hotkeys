@@ -1,4 +1,4 @@
-<#
+﻿<#
     Installe (ou desinstalle) la purge automatique des dossiers Ordo sur le poste courant.
 
     Installation :
@@ -24,7 +24,7 @@ function Bien([string]$m) { Write-Host "  $m" -ForegroundColor Green }
 function Souci([string]$m) { Write-Host "  $m" -ForegroundColor Yellow }
 
 Write-Host ''
-Write-Host "=== Purge auto des dossiers Ordo — poste $env:COMPUTERNAME / compte $env:USERNAME ===" -ForegroundColor Cyan
+Write-Host "=== Purge auto des dossiers Ordo - poste $env:COMPUTERNAME / compte $env:USERNAME ===" -ForegroundColor Cyan
 Write-Host ''
 
 if ($Desinstaller) {
@@ -150,7 +150,7 @@ foreach ($essai in 1..20) {
 
 Write-Host ''
 if ($vu) {
-    Bien 'Installation terminee — derniere ligne du journal :'
+    Bien 'Installation terminee - derniere ligne du journal :'
     Get-Content -LiteralPath $Journal -Tail 1 | ForEach-Object { Write-Host "      $_" }
 } else {
     Souci "La tache est enregistree mais n'a pas encore ecrit dans $Journal."
