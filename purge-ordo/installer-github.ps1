@@ -35,9 +35,10 @@ try {
     Write-Host '=== Purge auto des dossiers Ordo - telechargement depuis GitHub ===' -ForegroundColor Cyan
 
     foreach ($f in $Fichiers) {
-        # ?cb= : raw.githubusercontent garde les fichiers en cache quelques minutes,
-        # on veut la version qui vient d'etre poussee.
-        $url = '{0}/{1}?cb={2}' -f $Base, $f.Nom, [DateTime]::UtcNow.Ticks
+        # raw.githubusercontent sert une version poussee avec quelques minutes de retard,
+        # et ignore aussi bien un ?cb= que l'en-tete no-cache (mesure faite le 07/09/2026) :
+        # apres avoir modifie le depot, laisser passer ~5 min avant d'installer un poste.
+        $url = '{0}/{1}' -f $Base, $f.Nom
         $dest = Join-Path $Temp $f.Nom
         Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -TimeoutSec 60
 

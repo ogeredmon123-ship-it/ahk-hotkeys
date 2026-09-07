@@ -55,6 +55,7 @@ du dépôt). La tâche est retirée ; le script et le journal restent en place, 
 | Un fichier a disparu | La **Corbeille** d'abord, puis le journal — avant de soupçonner les scripts AHK |
 | Rien depuis hier soir | Normal : jeton interactif, **pas de purge session fermée** (la Corbeille est propre à chaque utilisateur) ; le passage manqué est rattrapé à l'ouverture de session |
 | Voir la tâche | Planificateur de tâches → racine → « Vider dossiers Ordo » |
+| J'ai modifié le dépôt et l'installeur prend l'ancienne version | `raw.githubusercontent` sert le fichier avec **~5 min** de cache, et ignore les astuces anti-cache (`?cb=`, en-tête `no-cache`) : attendre, ou copier le dossier et lancer `Installer.cmd` |
 
 ## Portabilité
 
