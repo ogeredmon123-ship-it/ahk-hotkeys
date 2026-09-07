@@ -3,12 +3,17 @@
 
     Installation :
       - copie vider-ordo.ps1 dans %USERPROFILE%\Scripts
+      - y depose de quoi desinstaller plus tard sans le depot
       - cree les dossiers Documents\CaptOrdo et Bureau\Ordo du jour s'ils manquent
-      - enregistre la tache planifiee "Vider dossiers Ordo" (toutes les 2 h, jeton interactif)
+      - cree la tache planifiee "Vider dossiers Ordo" (toutes les 2 h, jeton interactif)
       - lance un premier passage pour verifier
 
     Desinstallation : .\installer.ps1 -Desinstaller
-    Aucun droit administrateur necessaire : la tache tourne sous le compte courant.
+
+    Aucun droit administrateur : la tache passe par schtasks.exe, qui accepte un compte
+    standard tant que la tache tourne sous ce compte. Les applets Register-ScheduledTask
+    et consorts, elles, repondent "Acces refuse" sans elevation (mesure faite le 07/09/2026
+    avec un jeton utilisateur de base) : ne pas les reintroduire ici.
 #>
 
 [CmdletBinding()]
@@ -23,14 +28,23 @@ function Info([string]$m) { Write-Host "  $m" }
 function Bien([string]$m) { Write-Host "  $m" -ForegroundColor Green }
 function Souci([string]$m) { Write-Host "  $m" -ForegroundColor Yellow }
 
+function Tache-Existe {
+    $null = & schtasks.exe /query /tn $NomTache 2>&1
+    return ($LASTEXITCODE -eq 0)
+}
+
 Write-Host ''
 Write-Host "=== Purge auto des dossiers Ordo - poste $env:COMPUTERNAME / compte $env:USERNAME ===" -ForegroundColor Cyan
 Write-Host ''
 
 if ($Desinstaller) {
-    if (Get-ScheduledTask -TaskName $NomTache -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $NomTache -Confirm:$false
-        Bien "Tache planifiee `"$NomTache`" supprimee."
+    if (Tache-Existe) {
+        $sortie = & schtasks.exe /delete /tn $NomTache /f 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Bien "Tache planifiee `"$NomTache`" supprimee."
+        } else {
+            Souci ("Suppression refusee : " + ($sortie -join ' '))
+        }
     } else {
         Info "Aucune tache `"$NomTache`" sur ce poste."
     }
@@ -133,14 +147,35 @@ $Xml = @"
 </Task>
 "@
 
-Register-ScheduledTask -TaskName $NomTache -Xml $Xml -Force | Out-Null
+# schtasks lit le XML en UTF-16, pas autre chose.
+$XmlTemp = Join-Path $env:TEMP ('vider-ordo-' + [guid]::NewGuid().ToString('N').Substring(0, 8) + '.xml')
+Set-Content -LiteralPath $XmlTemp -Value $Xml -Encoding Unicode
+try {
+    $sortie = & schtasks.exe /create /tn $NomTache /xml $XmlTemp /f 2>&1
+    if ($LASTEXITCODE -ne 0 -and (Tache-Existe)) {
+        # Un compte standard cree sans probleme une tache qui n'existe pas encore, mais
+        # n'ecrase pas celle qu'une session administrateur a posee avant lui (mesure faite
+        # le 07/09/2026) : on tente de la retirer, puis de la recreer.
+        $null = & schtasks.exe /delete /tn $NomTache /f 2>&1
+        $sortie = & schtasks.exe /create /tn $NomTache /xml $XmlTemp /f 2>&1
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw ("schtasks n'a pas pu creer la tache : " + ($sortie -join ' ') + " -- si elle " +
+               "existe deja et a ete posee par un administrateur, relancer cet installeur en " +
+               "tant qu'administrateur (clic droit sur Installer.cmd).")
+    }
+} finally {
+    if (Test-Path -LiteralPath $XmlTemp) {
+        Remove-Item -LiteralPath $XmlTemp -Force -ErrorAction SilentlyContinue
+    }
+}
 Bien "Tache planifiee `"$NomTache`" enregistree (toutes les 2 h, a partir de 00h06)."
 
 # --- 4. Premier passage de verification --------------------------------------
 Info 'Premier passage de verification...'
-Start-ScheduledTask -TaskName $NomTache
 $Journal = Join-Path $env:USERPROFILE 'Scripts\vider-ordo.log'
 $attendu = (Get-Date).AddSeconds(-5)
+$null = & schtasks.exe /run /tn $NomTache 2>&1
 $vu = $false
 foreach ($essai in 1..20) {
     Start-Sleep -Milliseconds 500

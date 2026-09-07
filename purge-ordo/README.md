@@ -10,7 +10,13 @@ Vide **tout** le contenu de `Documents\CaptOrdo` et de `Bureau\Ordo du jour`
 ## Installer sur un nouveau poste
 
 Dans **la session Windows de la personne** qui utilise les scripts AHK (la purge s'installe
-pour ce compte-là, pas pour la machine). Aucun droit administrateur.
+pour ce compte-là, pas pour la machine).
+
+**Droits administrateur : non**, sur un poste où la tâche n'existe pas encore — vérifié en
+lançant l'installeur avec un jeton d'utilisateur standard. Seul cas contraire : si une tâche
+« Vider dossiers Ordo » y a déjà été posée **par un administrateur**, un compte standard ne
+peut pas l'écraser ; l'installeur le dit alors en clair et il faut le relancer par un clic
+droit → « Exécuter en tant qu'administrateur ».
 
 ### Le plus simple : depuis GitHub, rien à copier
 
@@ -47,6 +53,7 @@ procédure de **mise à jour**.
 
 Double-clic sur `%USERPROFILE%\Scripts\Desinstaller-purge-ordo.cmd` (ou sur `Desinstaller.cmd`
 du dépôt). La tâche est retirée ; le script et le journal restent en place, sans effet.
+
 ## Vérifier / dépanner
 
 | Question | Où regarder |
@@ -55,6 +62,7 @@ du dépôt). La tâche est retirée ; le script et le journal restent en place, 
 | Un fichier a disparu | La **Corbeille** d'abord, puis le journal — avant de soupçonner les scripts AHK |
 | Rien depuis hier soir | Normal : jeton interactif, **pas de purge session fermée** (la Corbeille est propre à chaque utilisateur) ; le passage manqué est rattrapé à l'ouverture de session |
 | Voir la tâche | Planificateur de tâches → racine → « Vider dossiers Ordo » |
+| « Accès refusé » à l'enregistrement de la tâche | Une tâche du même nom, posée par un administrateur, est déjà là : relancer l'installeur en administrateur (clic droit) |
 | J'ai modifié le dépôt et l'installeur prend l'ancienne version | `raw.githubusercontent` sert le fichier avec **~5 min** de cache, et ignore les astuces anti-cache (`?cb=`, en-tête `no-cache`) : attendre, ou copier le dossier et lancer `Installer.cmd` |
 
 ## Portabilité
