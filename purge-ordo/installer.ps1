@@ -53,6 +53,23 @@ if (-not (Test-Path -LiteralPath $DossierScripts)) {
 Copy-Item -LiteralPath $Source -Destination $Cible -Force
 Bien "Script installe : $Cible"
 
+# --- 1 bis. Rendre le poste autonome pour la suite ---------------------------
+# Installe par GitHub, il n'y a pas de dossier du depot sur le poste : on depose
+# l'installeur lui-meme et un Desinstaller.cmd a cote du script.
+$CopieInstalleur = Join-Path $DossierScripts 'installer-purge-ordo.ps1'
+if ($PSCommandPath -and ($PSCommandPath -ne $CopieInstalleur)) {
+    Copy-Item -LiteralPath $PSCommandPath -Destination $CopieInstalleur -Force
+}
+$Desinstalleur = Join-Path $DossierScripts 'Desinstaller-purge-ordo.cmd'
+Set-Content -LiteralPath $Desinstalleur -Encoding ASCII -Value @(
+    '@echo off',
+    'REM Retire la tache planifiee "Vider dossiers Ordo" de ce poste.',
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0installer-purge-ordo.ps1" -Desinstaller',
+    'echo.',
+    'pause'
+)
+Info "Desinstallation sur ce poste : $Desinstalleur"
+
 # --- 2. Dossiers surveilles ---------------------------------------------------
 foreach ($d in @((Join-Path $env:USERPROFILE 'Documents\CaptOrdo'),
                  (Join-Path $env:USERPROFILE 'Desktop\Ordo du jour'))) {
