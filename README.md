@@ -29,7 +29,11 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 |---|---|
 | **Ctrl+O** | Capture d'écran → PNG horodaté + nom patient dans `Documents\CaptOrdo` |
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
+| **Ctrl+D** *(visionneuse LGPI)* | Historique des délivrances → ancienne ordonnance **déjà scannée** : clique la **disquette** de la barre d'outils (repérée à l'image), remplit la boîte « Enregistrer » vers `CaptOrdo` et range le PDF qui en sort |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
+
+### Boîtes de fichiers de LGPI (Java/Swing)
+LGPI dessine ses boîtes « Ouvrir » / « Enregistrer » en Java : classe `SunAwtDialog`, **aucun contrôle Windows** à remplir, et le clavier arrive le plus souvent sur la **liste** des fichiers, pas sur « Nom du fichier » — d'où des Ctrl+V partis dans le vide. Le script essaie donc plusieurs positions de focus (telle quelle, mnémoniques, `Tab` après `Tab`), **relit** le champ après chaque tentative, et n'envoie Entrée qu'une fois le chemin relu à l'identique. S'il n'y arrive pas, il laisse la boîte ouverte, le chemin dans le presse-papiers, et **guette quand même** le fichier : une validation à la main suffit, le document est rangé et renommé.
 
 ### Garde-fous « bon fichier, bon patient »
 - **Contenu vérifié** : Ctrl+D lit les premiers octets du fichier obtenu et n'accepte que les images et les PDF. Une page web enregistrée par erreur — même nommée `.pdf` — est refusée ; si elle est déjà arrivée dans `CaptOrdo`, elle part à la corbeille.

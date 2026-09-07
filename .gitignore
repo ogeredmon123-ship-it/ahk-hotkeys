@@ -9,3 +9,6 @@ CaptOrdo/
 *.log
 Thumbs.db
 desktop.ini
+
+# Exception : les gabarits d'icônes de l'interface LGPI (img/) ne contiennent aucune donnée patient
+!img/*.png

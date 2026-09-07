@@ -12,6 +12,9 @@
 ;                 WhatsApp Web, Doctolib, image/PDF dans un onglet) dans
 ;                 CaptOrdo, nommé pareil — en cliquant lui-même Télécharger
 ;                 (UI Automation) ou par Ctrl+S. Échec → message → Ctrl+O.
+;                 Dans la VISIONNEUSE LGPI (historique des délivrances →
+;                 ancienne ordonnance DÉJÀ scannée) : clique la disquette de
+;                 sa barre d'outils et range le PDF qui en sort.
 ; Double Ctrl+I → boîte « Ouvrir » active (LGO, upload site) : insère le
 ;                 chemin du fichier le plus récent de CaptOrdo + Entrée.
 ;                 Sinon : copie ce fichier (et l'image, si c'est une capture)
@@ -32,6 +35,15 @@ EXT_IMPORT := "i)^(png|jpe?g|gif|bmp|webp|heic|pdf)$"   ; seuls ces types sont p
 ; vient d'échouer sans qu'on s'en aperçoive — Ctrl+I demande alors confirmation, au lieu d'insérer
 ; en silence le document du patient PRÉCÉDENT.
 FRAICHEUR_MIN := 10                              ; minutes ; 0 = désactivé
+; Visionneuse de scans de LGPI (« Visualisation/Numérisation … », historique des délivrances) : Ctrl+D
+; y sort le document par le bouton DISQUETTE de sa barre d'outils, repéré à l'image (la fenêtre bouge,
+; des coordonnées fixes ne tiendraient pas). Le gabarit est une capture 18×18 de cette icône.
+TITRE_VISIONNEUSE_LGPI := "i)(visualisation|num[ée]risation)"
+ICONE_ENREGISTRER := A_ScriptDir "\img\lgpi-enregistrer.png"
+; Étiquette « Nom du fichier : » des boîtes Java de LGPI. Repérée à l'image, elle donne la seule chose
+; qui manquait : un point où CLIQUER pour être sûr du focus avant de coller (voir InsererCheminSwing).
+ETIQUETTE_NOM_FICHIER := A_ScriptDir "\img\lgpi-nom-fichier.png"
+DECALAGE_CHAMP := 124                            ; px à droite du COIN GAUCHE de l'étiquette = dans le champ
 
 DirCreate DOSSIER
 
@@ -142,8 +154,13 @@ TelechargerVersCaptOrdo() {
     exe := ""
     try exe := WinGetProcessName(hwnd)
     J("--- Ctrl+D sur : " FenetreActive())
+    ; La visionneuse de LGPI n'est pas un navigateur et ne télécharge rien : elle a sa propre route.
+    if (exe ~= "i)^javaw?\.exe$" && WinGetTitle(hwnd) ~= TITRE_VISIONNEUSE_LGPI) {
+        SortirScanLGPI(hwnd, exe)
+        return
+    }
     if !(exe ~= "i)^(chrome|msedge|firefox|brave)\.exe$") {
-        Erreur("Ctrl+D se lance depuis le navigateur (Chrome, Edge, Firefox) : affiche le document du patient, puis Ctrl+D. Sinon : Ctrl+O.", 7000)
+        Erreur("Ctrl+D se lance depuis le navigateur (Chrome, Edge, Firefox) ou depuis la visionneuse LGPI. Sinon : Ctrl+O.", 7000)
         return
     }
     SetTimer(DevantNommer, -50)
@@ -361,6 +378,200 @@ AttendreFichier(chemin, ms) {
     return false
 }
 
+; ---------- Ctrl+D dans la visionneuse LGPI : ordonnance DÉJÀ scannée ----------
+; Historique des délivrances → une ancienne ordonnance → LGPI ouvre « Visualisation/Numérisation … » et y
+; affiche le scan. Il n'y a ni page web ni téléchargement à guetter : le seul moyen d'en ressortir le
+; document est le bouton DISQUETTE de sa barre d'outils. Ctrl+D le clique, remplit la boîte
+; « Enregistrer » vers CaptOrdo, puis range le fichier qui en sort — même si la boîte a dû être finie à
+; la main : LGPI dessine ses boîtes en Java, rien ne garantit qu'on puisse y écrire (InsererCheminSwing).
+SortirScanLGPI(hwnd, exe) {
+    SetTimer(DevantNommer, -50)
+    ib := InputBox("Le scan affiché va être enregistré dans CaptOrdo.`n`nNom du patient (vide = horodatage seul) :"
+        , "Télécharger vers CaptOrdo", "w460 h160")
+    if (ib.Result != "OK") {
+        J("    abandonné : nom du patient non saisi")
+        return
+    }
+    nom := NettoyerNom(ib.Value)
+    dest := DOSSIER "\" FormatTime(A_Now, "yyyy-MM-dd_HHmmss") (nom != "" ? "_" nom : "") ".pdf"
+    WinActivate hwnd
+    WinWaitActive hwnd, , 2
+    KeyWait "Ctrl"
+    dossiers := DossiersSortieLGPI()
+    avant := FichiersActuels(dossiers)
+    if CliquerDisquetteLGPI(hwnd)
+        Notif("Enregistrement du scan…", 30000)
+    else
+        Notif("Bouton disquette introuvable : cliquez-le vous-même dans la visionneuse — je range le fichier.", 20000)
+    dlg := AttendreBoiteFichierLGPI(exe, 8000)
+    if dlg {
+        J("    boîte « " WinGetTitle(dlg) " » | classe " WinGetClass(dlg))
+        if !RemplirBoiteFichier(dlg, dest)
+            Notif("Choisissez le dossier et validez : je range le document dans CaptOrdo.", 20000)
+    } else {
+        J("    aucune boîte « Enregistrer » repérée — on guette quand même le fichier")
+    }
+    src := AttendreDocumentLGPI(avant, dossiers, dest, dlg, 90000)
+    if (src = "") {
+        Erreur("Rien n'est sorti de la visionneuse LGPI (enregistrement annulé ?) → réessayez, ou Ctrl+O (capture).", 8000)
+        return
+    }
+    ; Contrôle sur le CONTENU : ce qui entre dans CaptOrdo doit être un document exploitable.
+    if !DocumentValide(src) {
+        J("Ctrl+D LGPI : REJET — " NomFichier(src) " n'est ni une image ni un PDF")
+        Erreur("Le fichier enregistré n'est ni une image ni un PDF — rien n'a été ajouté à CaptOrdo → Ctrl+O (capture).", 8000)
+        return
+    }
+    SplitPath src, , , &ext
+    vrai := ExtensionReelle(src, ext)
+    if (src = dest && vrai = ext) {           ; LGPI a écrit droit dans CaptOrdo, au nom demandé
+        J("Ctrl+D LGPI : OK -> " src)
+        Notif("Rangé dans CaptOrdo : " NomFichier(src), 5000)
+        return
+    }
+    final := DOSSIER "\" FormatTime(A_Now, "yyyy-MM-dd_HHmmss") (nom != "" ? "_" nom : "") (vrai != "" ? "." vrai : "")
+    try {
+        FileMove src, final, 1
+        J("Ctrl+D LGPI : OK -> " final (src != dest ? " (repris de " src ")" : ""))
+        Notif("Rangé dans CaptOrdo : " NomFichier(final), 5000)
+    } catch {
+        J("Ctrl+D LGPI : ÉCHEC du déplacement de " src)
+        Erreur("Enregistré mais impossible à déplacer (fichier verrouillé ?) : " src, 8000)
+    }
+}
+
+; Clique la disquette de la barre d'outils, repérée à l'IMAGE dans la fenêtre : la visionneuse se
+; déplace et se redimensionne, des coordonnées fixes viseraient à côté — au pire l'imprimante, juste à
+; côté. Le curseur est remis où il était. false = icône non trouvée (l'utilisateur cliquera lui-même).
+CliquerDisquetteLGPI(hwnd) {
+    if !FileExist(ICONE_ENREGISTRER) {
+        J("    gabarit d'icône absent : " ICONE_ENREGISTRER)
+        return false
+    }
+    CoordMode "Pixel", "Screen"
+    CoordMode "Mouse", "Screen"
+    try
+        WinGetPos &wx, &wy, &ww, &wh, hwnd
+    catch
+        return false
+    for tolerance in ["*25", "*50"] {        ; tolérance de couleur croissante (thème, anticrénelage)
+        try {
+            if ImageSearch(&ix, &iy, wx, wy, wx + ww, wy + wh, tolerance " " ICONE_ENREGISTRER) {
+                CliquerEcran(ix + 9, iy + 9)     ; centre du gabarit 18×18
+                J("    disquette cliquée en " (ix + 9) "," (iy + 9) " (tolérance " tolerance ")")
+                return true
+            }
+        }
+    }
+    J("    disquette introuvable dans la fenêtre (" wx "," wy " " ww "×" wh ")")
+    return false
+}
+
+; La boîte « Enregistrer » qui suit le clic : LGPI en ouvre tantôt une vraie (Windows, classe #32770 avec
+; un champ Edit1), tantôt une dessinée en Java (SunAwtDialog, aucun contrôle Windows). On ne retient une
+; #32770 que si elle a bien un champ de saisie — sinon c'est un simple message de LGPI.
+AttendreBoiteFichierLGPI(exe, ms) {
+    debut := A_TickCount
+    while (A_TickCount - debut < ms) {
+        for h in WinGetList("ahk_exe " exe) {
+            cls := "", titre := ""
+            try cls := WinGetClass(h)
+            try titre := WinGetTitle(h)
+            if (titre = "")
+                continue
+            if (cls = "#32770") {
+                try {
+                    ControlGetText("Edit1", h)
+                    return h
+                }
+                continue
+            }
+            ; radicaux, pas mots entiers : « Enregistrer sous », « Sauvegarde du document », « Exporter »…
+            if (cls = "SunAwtDialog" && titre ~= "i)(enregistr|sauvegard|\bsave\b|export|choisir|s[ée]lectionn|parcourir)")
+                return h
+        }
+        Sleep 200
+    }
+    return 0
+}
+
+RemplirBoiteFichier(dlg, dest) {
+    cls := ""
+    try cls := WinGetClass(dlg)
+    if (cls = "#32770" && RemplirBoiteEnregistrer(dlg, dest)) {
+        J("    chemin inséré dans la boîte Windows « Enregistrer »")
+        return true
+    }
+    return InsererCheminSwing(dlg, dest, true)   ; boîte « Enregistrer » : on valide, rien ne peut être écrasé
+}
+
+; Où LGPI peut déposer le PDF : il propose le dossier de la DERNIÈRE sauvegarde (« Ordo du jour », le
+; Bureau, Téléchargements…) — impossible à connaître d'avance, on guette donc large, CaptOrdo compris
+; (l'utilisateur peut y enregistrer à la main, sous le nom VisuScan_… proposé par LGPI).
+DossiersSortieLGPI() {
+    liste := []
+    Ajouter(d) {
+        d := RTrim(Trim(d), "\")
+        if (d = "" || !DirExist(d))
+            return
+        for x in liste
+            if (x = d)
+                return
+        liste.Push(d)
+    }
+    for d in DOSSIERS_TELECHARGEMENT
+        Ajouter(d)
+    Ajouter(A_Desktop "\Ordo du jour")
+    Ajouter(EnvGet("USERPROFILE") "\Desktop\Ordo du jour")
+    Ajouter(EnvGet("USERPROFILE") "\Documents")
+    Ajouter(DOSSIER)
+    return liste
+}
+
+; Attend le document : soit il arrive pile à l'adresse demandée (le chemin a été inséré), soit ailleurs
+; (boîte finie à la main) — on prend alors le fichier APPARU depuis le clic. Taille inchangée d'un
+; passage à l'autre = écriture terminée. Si la boîte s'est refermée sans rien produire (Annuler), inutile
+; d'attendre la fin du délai : on abrège au bout de 12 s.
+AttendreDocumentLGPI(avant, dossiers, dest, dlg, ms) {
+    debut := A_TickCount, vus := Map(), fermee := 0
+    while (A_TickCount - debut < ms) {
+        if Stabilise(dest, vus)
+            return dest
+        for dossier in dossiers {
+            Loop Files dossier "\*.*" {
+                if (A_LoopFileExt ~= "i)^(tmp|part|partial|crdownload|ini|lnk|db)$")
+                    continue
+                if (avant.Has(A_LoopFileFullPath) || A_LoopFileFullPath = dest)
+                    continue
+                if Stabilise(A_LoopFileFullPath, vus)
+                    return A_LoopFileFullPath
+            }
+        }
+        if (dlg && !WinExist("ahk_id " dlg)) {
+            if !fermee
+                fermee := A_TickCount
+            else if (A_TickCount - fermee > 12000)
+                return ""
+        }
+        Sleep 400
+    }
+    return ""
+}
+
+; Le fichier existe et sa taille n'a pas bougé depuis le passage précédent = écriture terminée
+Stabilise(chemin, vus) {
+    if !FileExist(chemin)
+        return false
+    taille := -1
+    try taille := FileGetSize(chemin)
+    if (taille < 0)
+        return false
+    if (vus.Has(chemin) && vus[chemin] = taille && taille > 0)
+        return true
+    vus[chemin] := taille
+    return false
+}
+
 ; ---------- Double Ctrl+I : import dans la boîte « Ouvrir » active ----------
 iPending := false
 
@@ -452,45 +663,136 @@ BoiteFichierJava() {
     return 0
 }
 
-; Insère le chemin dans la boîte Java : collage en TEXTE dans « Nom du fichier », puis Entrée — mais
-; l'Entrée n'est envoyée qu'APRÈS relecture du champ. Si le clavier était resté sur la LISTE des
-; fichiers, le collage n'a rien fait et une Entrée à l'aveugle ouvrirait le fichier sélectionné : le
-; document d'un AUTRE patient. Renvoie false seulement si la boîte a disparu (→ repli presse-papiers).
+; Boîte « Ouvrir » de LGPI : insertion prudente (voir InsererCheminSwing, enregistrement = false) — sans
+; certitude sur le focus, aucune Entrée n'est envoyée, car elle ouvrirait le fichier sélectionné dans la
+; LISTE : le document d'un AUTRE patient. Échec → message + chemin dans le presse-papiers, et l'appel
+; est tout de même considéré comme TRAITÉ. Renvoie false seulement si la boîte a disparu entre-temps
+; (→ repli presse-papiers du côté de ImporterDernierFichier).
 InsererCheminJava(hwnd, chemin) {
+    if InsererCheminSwing(hwnd, chemin)
+        return true
+    if !WinExist("ahk_id " hwnd)
+        return false         ; la boîte a disparu → repli presse-papiers
+    Erreur("LGPI n'a pas pris le chemin : cliquez dans « Nom du fichier », puis Ctrl+V et Entrée (le chemin est dans le presse-papiers).", 10000)
+    return true              ; traité : surtout ne pas coller un fichier par-dessus
+}
+
+; Écrit un chemin dans une boîte de fichiers dessinée par Java/Swing, et valide.
+;
+; Le collage, lui, a toujours marché : la capture du 07/09 montre le chemin bel et bien écrit dans
+; « Nom du fichier ». Ce qui échouait, c'était la RELECTURE de contrôle — Ctrl+Inser ne rend rien en
+; Swing, le script en concluait « je n'ai rien écrit », refusait d'appuyer sur Entrée et laissait la
+; boîte plantée à demander où enregistrer (et, côté Ctrl+I, sept « champ lu : «  » » le 05/09).
+;
+; On ne se fie donc plus à la relecture mais au FOCUS : un clic dans le champ, repéré par son étiquette
+; (CliquerChampNomFichier), et l'Entrée peut partir. Sans ce clic, repli au clavier — tel quel, la
+; mnémonique du libellé, puis Tab après Tab — avec relecture, qui vaut confirmation quand elle répond.
+;
+; enregistrement = true (boîte « Enregistrer ») : on valide même sans certitude. Rien ne peut être
+; écrasé, le pire est un fichier écrit sous le nom proposé par LGPI — que SortirScanLGPI rattrape et
+; range. Dans une boîte « Ouvrir » (false), au contraire, une Entrée mal placée chargerait le document
+; d'un AUTRE patient : sans clic ni relecture concluante, on n'envoie rien.
+; Le presse-papiers garde le chemin en sortie, pour un Ctrl+V manuel.
+InsererCheminSwing(hwnd, chemin, enregistrement := false) {
     titre := ""
     try titre := WinGetTitle("ahk_id " hwnd)
     WinActivate hwnd
     if !WinWaitActive("ahk_id " hwnd, , 2)
         return false
+    ; Focus certain : on clique dans « Nom du fichier », au lieu d'espérer que Swing l'ait donné au champ
+    clique := CliquerChampNomFichier(hwnd)
+    essais := clique ? [""] : ["", "!n"]     ; sans clic : tel quel, puis la mnémonique « &Nom du fichier »
+    if !clique
+        Loop 8
+            essais.Push("{Tab}")
+    for touche in essais {
+        if !WinExist("ahk_id " hwnd)
+            return false
+        if (touche != "")
+            Send touche
+        Sleep 80
+        lu := CollerEtRelire(chemin)
+        if (lu != chemin && lu != "") {
+            ; le champ répond mais le collage n'a pas pris : on tape le chemin caractère par caractère
+            Send "{Home}+{End}"
+            SendText chemin
+            Sleep 150
+            lu := ChampRelu(600)
+        }
+        sur := (lu = chemin) || (clique || enregistrement)
+        if sur {
+            Send "{End}{Enter}"
+            A_Clipboard := chemin
+            J("    chemin inséré dans la boîte Java « " titre " » ("
+                . (lu = chemin ? "champ relu" : clique ? "clic dans le champ" : "validé d'office") ")")
+            Notif("Inséré : " NomFichier(chemin), 5000)
+            return true
+        }
+    }
+    A_Clipboard := chemin
+    J("    boîte Java « " titre " » : le chemin n'a pu être écrit dans aucun champ — Entrée non envoyée")
+    return false
+}
+
+; Clique dans le champ « Nom du fichier » d'une boîte Java, repéré par son ÉTIQUETTE : Swing n'expose
+; aucun contrôle Windows, mais l'étiquette est toujours dessinée pareil et le champ commence juste à sa
+; droite. false = étiquette introuvable (autre thème, boîte d'un autre logiciel) → repli au clavier.
+CliquerChampNomFichier(hwnd) {
+    if !FileExist(ETIQUETTE_NOM_FICHIER)
+        return false
+    CoordMode "Pixel", "Screen"
+    try
+        WinGetPos &wx, &wy, &ww, &wh, hwnd
+    catch
+        return false
+    for tolerance in ["*25", "*50"] {
+        try {
+            if ImageSearch(&ix, &iy, wx, wy, wx + ww, wy + wh, tolerance " " ETIQUETTE_NOM_FICHIER) {
+                CliquerEcran(ix + DECALAGE_CHAMP, iy + 8)
+                J("    clic dans « Nom du fichier » en " (ix + DECALAGE_CHAMP) "," (iy + 8))
+                return true
+            }
+        }
+    }
+    J("    étiquette « Nom du fichier » introuvable dans la boîte")
+    return false
+}
+
+; Clic à un point de l'ÉCRAN, curseur remis où il était (on travaille par-dessus l'épaule de quelqu'un)
+CliquerEcran(x, y) {
+    CoordMode "Mouse", "Screen"
+    MouseGetPos &ox, &oy
+    MouseMove x, y, 0
+    Sleep 80
+    Click
+    Sleep 80
+    MouseMove ox, oy, 0
+}
+
+; Colle le chemin par-dessus ce que la boîte propose déjà, puis relit ce que le champ contient
+CollerEtRelire(chemin) {
     A_Clipboard := chemin
     if !ClipWait(2, 0)
-        return false
+        return ""
     Send "{Home}+{End}"      ; remplace ce que la boîte propose déjà, au lieu de coller à la suite
     Send "^v"
-    Sleep 250
-    lu := ChampRelu()
-    A_Clipboard := chemin    ; le chemin reste sous la main pour un Ctrl+V manuel
-    if (lu != chemin) {
-        J("    boîte Java « " titre " » : chemin NON inséré (champ lu : « " lu " ») — Entrée non envoyée")
-        Erreur("LGPI n'a pas pris le chemin : cliquez dans « Nom du fichier », puis Ctrl+V et Entrée (le chemin est dans le presse-papiers).", 10000)
-        return true          ; traité : surtout ne pas coller un fichier par-dessus
-    }
-    Send "{End}{Enter}"
-    J("    inséré dans la boîte Java « " titre " »")
-    Notif("Inséré : " NomFichier(chemin), 5000)
-    return true
+    Sleep 180
+    return ChampRelu(600)
 }
 
 ; Relit le champ qui vient d'être collé : sélection de la ligne, puis copie. La copie passe par
 ; Ctrl+Inser (équivalent Swing de Ctrl+C) — un Ctrl+C simulé déclencherait le ~^c de
 ; recherche-selection.ahk. La sentinelle distingue « champ vide » de « rien n'a été copié » (clavier
-; hors du champ de saisie) ; dans les deux cas le résultat diffère du chemin, donc pas d'Entrée.
-ChampRelu() {
+; hors du champ de saisie).
+; ATTENTION : dans les boîtes Swing de LGPI cette relecture revient TOUJOURS vide, même quand le champ
+; est correctement rempli — elle ne vaut donc que comme confirmation POSITIVE, jamais comme preuve
+; d'échec. C'est le clic dans le champ qui fait foi (voir InsererCheminSwing).
+ChampRelu(msMax := 1200) {
     static SENTINELLE := "«?»"
     A_Clipboard := SENTINELLE
     Send "{Home}+{End}^{Insert}"
     debut := A_TickCount
-    while (A_TickCount - debut < 1200) {
+    while (A_TickCount - debut < msMax) {
         Sleep 100
         if (A_Clipboard != SENTINELLE)
             return Trim(A_Clipboard)
