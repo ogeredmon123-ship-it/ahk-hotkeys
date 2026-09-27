@@ -14,7 +14,7 @@
         q := Trim(A_Clipboard)
         if (q = "")
             return
-        Run "https://www.google.com/search?q=" . UrlEncode(q)
+        OuvrirChrome("https://www.google.com/search?q=" . UrlEncode(q))
     }
 }
 
@@ -121,7 +121,7 @@ YoutubeBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q != "")
-        Run "https://www.youtube.com/results?search_query=" . UrlEncode(q)
+        OuvrirChrome("https://www.youtube.com/results?search_query=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+G → boîte de saisie flottante :
@@ -175,9 +175,9 @@ GoogleBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q = "")
-        Run 'chrome.exe "https://www.google.com/"'  ; champ vide = ouvre Chrome sur Google
+        OuvrirChrome("https://www.google.com/")  ; champ vide = ouvre Chrome sur Google
     else
-        Run "https://www.google.com/search?q=" . UrlEncode(q)
+        OuvrirChrome("https://www.google.com/search?q=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+K → ouvre Claude Code dans Windows Terminal.
@@ -266,9 +266,9 @@ VidalBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q = "")
-        Run "https://www.vidal.fr/"  ; champ vide = atterrissage sur l'accueil VIDAL
+        OuvrirChrome("https://www.vidal.fr/")  ; champ vide = atterrissage sur l'accueil VIDAL
     else
-        Run "https://www.vidal.fr/recherche.html?query=" . UrlEncode(q)
+        OuvrirChrome("https://www.vidal.fr/recherche.html?query=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+T → ouvre THERIAQUE sur la page de recherche simple.
@@ -297,7 +297,7 @@ TheriaqueTap(natif := false) {
     if (pending) {
         SetTimer(TheriaqueTapNatif, 0)
         pending := false
-        Run "https://www.theriaque.org/apps/recherche/rch_simple.php"
+        OuvrirChrome("https://www.theriaque.org/apps/recherche/rch_simple.php")
     } else {
         pending := true
         SetTimer(TheriaqueTapNatif, -DELAI)
@@ -329,7 +329,7 @@ MeddisparTap(natif := false) {
     if (pending) {
         SetTimer(MeddisparTapNatif, 0)
         pending := false
-        Run "https://www.meddispar.fr/"
+        OuvrirChrome("https://www.meddispar.fr/")
     } else {
         pending := true
         SetTimer(MeddisparTapNatif, -DELAI)
@@ -468,9 +468,9 @@ ClaudeBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q = "")
-        Run "https://claude.ai/new"  ; champ vide = conversation vierge
+        OuvrirChrome("https://claude.ai/new")  ; champ vide = conversation vierge
     else
-        Run "https://claude.ai/new?q=" . UrlEncode(q)
+        OuvrirChrome("https://claude.ai/new?q=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+<touche Calculatrice> (Launch_App2) → clavier arabe :
@@ -513,4 +513,14 @@ UrlEncode(str) {
         out .= (c ~= "[0-9A-Za-z\-_.~]") ? c : Format("%{:02X}", b)
     }
     return out
+}
+
+; Ouvre une URL dans Google Chrome plutôt que dans le navigateur par défaut.
+; Repli automatique sur le navigateur par défaut si chrome.exe est introuvable
+; (Run lève alors une exception au lieu d'ouvrir quoi que ce soit).
+OuvrirChrome(url) {
+    try
+        Run 'chrome.exe "' url '"'
+    catch
+        Run url
 }

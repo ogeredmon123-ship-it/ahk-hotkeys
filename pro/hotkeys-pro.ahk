@@ -4,7 +4,7 @@
 
 ; ============================================================
 ; HOTKEYS OFFICINE — version PRO (poste de travail en pharmacie)
-; Un seul fichier, 8 raccourcis, tous en DOUBLE APPUI RAPIDE
+; Un seul fichier, 9 raccourcis, tous en DOUBLE APPUI RAPIDE
 ; (deux Ctrl+X en < 0,5 s). Un seul appui = comportement natif.
 ;
 ;   Double Ctrl+C → recherche Google du texte copié
@@ -12,6 +12,7 @@
 ;   Double Ctrl+U → boîte de saisie → YouTube
 ;   Double Ctrl+T → ouvre Theriaque (page recherche simple)
 ;   Double Ctrl+M → ouvre Meddispar
+;   Double Ctrl+B → boîte de saisie → VIDAL (vide = accueil vidal.fr)
 ;   Double Ctrl+O → capture d'écran → PNG horodaté + nom patient (CaptOrdo)
 ;   Double Ctrl+D → rapatrie le dernier téléchargement dans CaptOrdo
 ;   Double Ctrl+I → injecte le dernier fichier CaptOrdo dans la boîte « Ouvrir »
@@ -420,7 +421,8 @@ ImporterDernierFichier() {
     ; La boîte « Ouvrir » est repérée AVANT le contrôle de fraîcheur : sa MsgBox prend le focus, et
     ; « la fenêtre active » ne serait alors plus la boîte de dialogue du logiciel officine.
     hDlg := WinActive("ahk_class #32770")   ; 0 = aucune boîte Ouvrir/Enregistrer au premier plan
-    J("--- Ctrl+I sur : " FenetreActive() " | boîte standard : " (hDlg ? "oui" : "non"))
+    hSel := hDlg ? 0 : SelecteurJava()      ; sinon : sélecteur de fichiers Java/Swing (LGPI)
+    J("--- Ctrl+I sur : " FenetreActive() " | boîte standard : " (hDlg ? "oui" : hSel ? "Java" : "non"))
     J("    fichier retenu : " NomFichier(dernier) " (" AgeTexte(AgeMinutes(dernier)) ")")
     dernier := ConfirmerSiVieux(dernier, "Insérer")
     if (dernier = "") {   ; chaîne vide = l'utilisateur a refusé
@@ -440,6 +442,25 @@ ImporterDernierFichier() {
         }
         ; contrôle introuvable → repli presse-papiers ci-dessous
     }
+    ; Sélecteur de fichiers d'une application JAVA (LGPI : F9 « Ajout Doc. » → « Ouvrir »).
+    ; Il est dessiné par Swing : ce n'est PAS une boîte Windows standard (#32770), il n'a aucun
+    ; contrôle « Edit1 » à remplir, et surtout il ne comprend pas le presse-papiers de fichiers
+    ; (CF_HDROP) — d'où le Ctrl+V qui « ne collait rien ». On tape donc le chemin au clavier dans
+    ; le champ « Nom du fichier », qui a le focus à l'ouverture du sélecteur, puis Entrée.
+    if (hSel && WinExist("ahk_id " hSel)) {
+        WinActivate hSel
+        WinWaitActive "ahk_id " hSel, , 1
+        Sleep 80
+        SendMode "Event"        ; frappe touche par touche : Swing perd des caractères en SendInput
+        SetKeyDelay 12, 12
+        SendText dernier
+        Sleep 150
+        Send "{Enter}"
+        SendMode "Input"
+        J("    chemin tapé dans le sélecteur Java")
+        Notif("Importé : " NomFichier(dernier), 4000)
+        return
+    }
     ; copie le FICHIER dans le presse-papiers (comme Ctrl+C dans l'Explorateur) — pour une capture
     ; (PNG/JPG) l'IMAGE elle-même est ajoutée aussi — puis le colle (Ctrl+V) dans la fenêtre active :
     ; pièce jointe dans Gmail / Doctolib / WhatsApp Web, image dans un mail, un chat ou Word
@@ -447,6 +468,24 @@ ImporterDernierFichier() {
     Send "^v"
     J("    collé dans " FenetreActive())
     Notif("Collé : " NomFichier(dernier) "  (reste dans le presse-papiers → Ctrl+V ailleurs si besoin)", 6000)
+}
+
+; La fenêtre active est-elle un sélecteur de fichiers Java/Swing (LGPI, logiciels officine en Java) ?
+; Renvoie son hwnd, ou 0. Reconnaissance en deux temps — processus java(w).exe OU classe SunAwt*
+; (fenêtre Java), ET titre d'une boîte d'ouverture / d'enregistrement — pour ne pas se déclencher
+; dans une fenêtre Java ordinaire, où la frappe du chemin n'aurait aucun sens.
+SelecteurJava() {
+    try {
+        hwnd := WinActive("A")
+        if !hwnd
+            return 0
+        if !(WinGetProcessName(hwnd) ~= "i)^javaw?\.exe$") && !(WinGetClass(hwnd) ~= "i)^SunAwt")
+            return 0
+        titre := WinGetTitle(hwnd)
+        if (titre ~= "i)^\s*(Ouvrir|Open|Importer|Import|Charger|Parcourir|Browse|Sélectionner|Selectionner|Choisir|Enregistrer|Save)")
+            return hwnd
+    }
+    return 0
 }
 
 ; Met un fichier dans le presse-papiers (CF_HDROP) ; si c'est une image, ajoute aussi l'image (bitmap + PNG)
@@ -693,7 +732,7 @@ FermerErreur(g) {
 }
 
 ; ============================================================
-; PARTIE 2 — Recherche (C, G, U, T, M)
+; PARTIE 2 — Recherche (C, G, U, T, M, B)
 ; ============================================================
 
 ; Double appui rapide sur Ctrl+C → recherche Google du texte copié.
@@ -709,7 +748,7 @@ FermerErreur(g) {
         q := Trim(A_Clipboard)
         if (q = "")
             return
-        Run "https://www.google.com/search?q=" . UrlEncode(q)
+        OuvrirChrome("https://www.google.com/search?q=" . UrlEncode(q))
     }
 }
 
@@ -764,9 +803,9 @@ GoogleBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q = "")
-        Run "https://www.google.com/"  ; champ vide = ouvre Google dans le navigateur par défaut
+        OuvrirChrome("https://www.google.com/")  ; champ vide = ouvre Chrome sur Google
     else
-        Run "https://www.google.com/search?q=" . UrlEncode(q)
+        OuvrirChrome("https://www.google.com/search?q=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+U → boîte de saisie flottante : tape ta requête,
@@ -818,7 +857,7 @@ YoutubeBoxSubmit(box, champ) {
     q := Trim(champ.Value)
     box.Hide()
     if (q != "")
-        Run "https://www.youtube.com/results?search_query=" . UrlEncode(q)
+        OuvrirChrome("https://www.youtube.com/results?search_query=" . UrlEncode(q))
 }
 
 ; Double appui rapide sur Ctrl+T → ouvre THERIAQUE sur la page de recherche simple.
@@ -847,7 +886,7 @@ TheriaqueTap(natif := false) {
     if (pending) {
         SetTimer(TheriaqueTapNatif, 0)
         pending := false
-        Run "https://www.theriaque.org/apps/recherche/rch_simple.php"
+        OuvrirChrome("https://www.theriaque.org/apps/recherche/rch_simple.php")
     } else {
         pending := true
         SetTimer(TheriaqueTapNatif, -DELAI)
@@ -879,7 +918,7 @@ MeddisparTap(natif := false) {
     if (pending) {
         SetTimer(MeddisparTapNatif, 0)
         pending := false
-        Run "https://www.meddispar.fr/"
+        OuvrirChrome("https://www.meddispar.fr/")
     } else {
         pending := true
         SetTimer(MeddisparTapNatif, -DELAI)
@@ -887,6 +926,68 @@ MeddisparTap(natif := false) {
 }
 
 MeddisparTapNatif() => MeddisparTap(true)
+
+; Double appui rapide sur Ctrl+B (B comme la Bible du médicament) → boîte de recherche
+; VIDAL, toujours vide :
+;   Entrée avec du texte  → page de résultats vidal.fr
+;   Entrée champ vide     → page d'accueil vidal.fr (recherche sur le site)
+;   Échap                 → annuler
+; Ctrl+V fonctionne dans la boîte pour y coller le presse-papiers.
+; Un seul Ctrl+B = comportement natif (gras…), renvoyé après DELAI ms.
+; Désactivé quand la boîte elle-même a le focus, pour ne pas gêner la saisie.
+#HotIf !WinActive("Recherche VIDAL ahk_class AutoHotkeyGUI")
+$^b:: VidalTap()
+#HotIf
+
+VidalTap(natif := false) {
+    static DELAI := 300  ; ms d'attente avant de rendre Ctrl+B natif — baisser si la latence gêne
+    static last := 0, pending := false
+    if (natif) {  ; timer échu : c'était un appui simple → gras normal
+        pending := false
+        Send "^b"
+        return
+    }
+    now := A_TickCount
+    if (now - last < 50) {  ; auto-repeat (touche maintenue) : ignorer
+        last := now
+        return
+    }
+    last := now
+    if (pending) {
+        SetTimer(VidalTapNatif, 0)
+        pending := false
+        ShowVidalBox()
+    } else {
+        pending := true
+        SetTimer(VidalTapNatif, -DELAI)
+    }
+}
+
+VidalTapNatif() => VidalTap(true)
+
+ShowVidalBox() {
+    static box := 0, champ := 0
+    if !box {
+        box := Gui("+AlwaysOnTop +ToolWindow -MinimizeBox", "Recherche VIDAL")
+        box.SetFont("s11")
+        champ := box.Add("Edit", "w420")
+        box.Add("Button", "Default Hidden", "OK").OnEvent("Click", (*) => VidalBoxSubmit(box, champ))
+        box.OnEvent("Escape", (*) => box.Hide())
+        box.OnEvent("Close", (*) => box.Hide())
+    }
+    champ.Value := ""  ; toujours vide : Ctrl+V dans la boîte si tu veux le presse-papiers
+    box.Show("AutoSize Center")
+    champ.Focus()
+}
+
+VidalBoxSubmit(box, champ) {
+    q := Trim(champ.Value)
+    box.Hide()
+    if (q = "")
+        OuvrirChrome("https://www.vidal.fr/")  ; champ vide = atterrissage sur l'accueil VIDAL
+    else
+        OuvrirChrome("https://www.vidal.fr/recherche.html?query=" . UrlEncode(q))
+}
 
 ; ---------- Utilitaire ----------
 
@@ -900,4 +1001,14 @@ UrlEncode(str) {
         out .= (c ~= "[0-9A-Za-z\-_.~]") ? c : Format("%{:02X}", b)
     }
     return out
+}
+
+; Ouvre une URL dans Google Chrome plutôt que dans le navigateur par défaut.
+; Repli automatique sur le navigateur par défaut si chrome.exe est introuvable
+; (Run lève alors une exception au lieu d'ouvrir quoi que ce soit).
+OuvrirChrome(url) {
+    try
+        Run 'chrome.exe "' url '"'
+    catch
+        Run url
 }
