@@ -1,6 +1,6 @@
 # Hotkeys officine — version PRO (poste de travail en pharmacie)
 
-**Deux fichiers** : `hotkeys-pro.ahk` (AutoHotkey **v2**) + `Lib\UIA.ahk` (bibliothèque UI Automation, utilisée par Ctrl+D), 8 raccourcis en **double appui rapide** (deux Ctrl+X en < 0,5 s). Un seul appui garde le comportement natif de la touche. Sous-ensemble strictement professionnel des scripts de la racine — sans TTS, sans IA, sans clavier arabe.
+**Deux fichiers** : `hotkeys-pro.ahk` (AutoHotkey **v2**) + `Lib\UIA.ahk` (bibliothèque UI Automation, utilisée par Ctrl+D), 9 raccourcis en **double appui rapide** (deux Ctrl+X en < 0,5 s). Un seul appui garde le comportement natif de la touche. Sous-ensemble strictement professionnel des scripts de la racine — sans TTS, sans IA, sans clavier arabe.
 
 | Double appui | Action |
 |---|---|
@@ -9,9 +9,12 @@
 | **Ctrl+U** | Boîte de saisie → YouTube |
 | **Ctrl+T** | Ouvre Theriaque (page recherche simple) |
 | **Ctrl+M** | Ouvre Meddispar |
+| **Ctrl+B** | Boîte de saisie → VIDAL (Entrée à vide = accueil vidal.fr) |
 | **Ctrl+O** | Capture d'écran → PNG horodaté + nom patient dans `Documents\CaptOrdo` |
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
+
+Toutes les pages web ci-dessus s'ouvrent dans **Google Chrome** (repli sur le navigateur par défaut si Chrome est absent du poste).
 
 ### Garde-fous « bon fichier, bon patient »
 - **Contenu vérifié** : Ctrl+D n'accepte que les images et les PDF, reconnus à leurs premiers octets. Une page web enregistrée par erreur — même nommée `.pdf` — est refusée ; si elle est déjà arrivée dans `CaptOrdo`, elle part à la corbeille.
