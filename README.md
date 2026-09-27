@@ -29,7 +29,11 @@ Tous les raccourcis sont en **double appui rapide** (deux Ctrl+X en < ~0,5 s) ; 
 |---|---|
 | **Ctrl+O** | Capture d'écran → PNG horodaté + nom patient dans `Documents\CaptOrdo` |
 | **Ctrl+D** | Télécharge le document affiché (aperçu Gmail, WhatsApp Web, Doctolib, image/PDF dans un onglet) dans `CaptOrdo`, nommé — clique lui-même « Télécharger » (UI Automation) ou passe par Ctrl+S ; échec → message → Ctrl+O |
+| **Ctrl+D** *(visionneuse LGPI)* | Historique des délivrances → ancienne ordonnance **déjà scannée** : clique la **disquette** de la barre d'outils (repérée à l'image), remplit la boîte « Enregistrer » vers `CaptOrdo` et range le PDF qui en sort |
 | **Ctrl+I** | Dans une boîte « Ouvrir » : insère le dernier fichier de `CaptOrdo` + Entrée ; sinon le copie (fichier + image si capture) et le colle dans la fenêtre active |
+
+### Boîtes de fichiers de LGPI (Java/Swing)
+LGPI dessine ses boîtes « Ouvrir » / « Enregistrer » en Java : classe `SunAwtDialog`, **aucun contrôle Windows** à remplir, et le clavier arrive le plus souvent sur la **liste** des fichiers, pas sur « Nom du fichier » — d'où des Ctrl+V partis dans le vide. Le script essaie donc plusieurs positions de focus (telle quelle, mnémoniques, `Tab` après `Tab`), **relit** le champ après chaque tentative, et n'envoie Entrée qu'une fois le chemin relu à l'identique. S'il n'y arrive pas, il laisse la boîte ouverte, le chemin dans le presse-papiers, et **guette quand même** le fichier : une validation à la main suffit, le document est rangé et renommé.
 
 ### Garde-fous « bon fichier, bon patient »
 - **Contenu vérifié** : Ctrl+D lit les premiers octets du fichier obtenu et n'accepte que les images et les PDF. Une page web enregistrée par erreur — même nommée `.pdf` — est refusée ; si elle est déjà arrivée dans `CaptOrdo`, elle part à la corbeille.
@@ -45,6 +49,7 @@ Purge RGPD automatique : les fichiers de `CaptOrdo` de plus de 30 jours partent 
 2. **Cloner ce dépôt** (ou copier les deux `.ahk`).
 3. **Tester** : double-clic sur chaque `.ahk` → une icône verte « H » apparaît dans la zone de notification = le script tourne.
 4. **Démarrage automatique** : `Win+R` → `shell:startup` → y déposer un **raccourci** vers chaque `.ahk`.
+5. **Purge automatique des dossiers Ordo** (recommandé) — une ligne dans PowerShell, rien à copier : `irm https://raw.githubusercontent.com/ogeredmon123-ship-it/ahk-hotkeys/main/purge-ordo/installer-github.ps1 | iex` → `CaptOrdo` et « Ordo du jour » sont vidés vers la **Corbeille toutes les 2 h** par une tâche planifiée. Voir [`purge-ordo/README.md`](purge-ordo/README.md).
 
 ### Dépendances par hotkey
 - **Ctrl+R (TTS)** : voix fr-FR (ex. Hortense/SAPI) installée, sinon voix par défaut.
